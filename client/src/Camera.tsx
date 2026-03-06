@@ -35,7 +35,9 @@ export default function Camera() {
   } = useUpload();
 
   const handleUpload = () => {
-    uploadData(videoBlob, image1, image2, setMessage);
+    if (videoBlob && image1 && image2) {
+      uploadData(videoBlob, image1, image2, setMessage);
+    }
   };
 
   return (

@@ -52,7 +52,7 @@ export default function useUpload() {
     setError(null);
     setRetryCount(attempt - 1);
     
-    let progressInterval: NodeJS.Timeout;
+    let progressInterval: ReturnType<typeof setInterval> | undefined;
     const startProgress = () => {
       progressInterval = setInterval(() => {
         setUploadProgress(prev => {
@@ -80,7 +80,7 @@ export default function useUpload() {
       });
       
       clearTimeout(timeoutId);
-      clearInterval(progressInterval);
+      if (progressInterval) clearInterval(progressInterval);
       
       const result = await response.json();
       if (response.ok) {
@@ -91,7 +91,7 @@ export default function useUpload() {
         throw new Error(result.error || 'Upload thất bại');
       }
     } catch (err: any) {
-      clearInterval(progressInterval);
+      if (progressInterval) clearInterval(progressInterval);
       
       // Retry logic
       if (attempt < 3) {

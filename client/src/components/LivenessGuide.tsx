@@ -25,8 +25,8 @@ export default function LivenessGuide({ isRecording, onComplete }: LivenessGuide
       return;
     }
 
-    let stepTimer: NodeJS.Timeout;
-    let countdownTimer: NodeJS.Timeout;
+    let stepTimer: ReturnType<typeof setTimeout>;
+    let countdownTimer: ReturnType<typeof setInterval>;
 
     // Đếm ngược tổng thời gian
     countdownTimer = setInterval(() => {

@@ -89,9 +89,13 @@ export default function useLivenessCapture() {
     const canvas = canvasRef.current;
     const video = videoRef.current;
     
+    if (!canvas || !video) return;
+    
     canvas.width = video.videoWidth;
     canvas.height = video.videoHeight;
-    canvas.getContext('2d').drawImage(video, 0, 0);
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    ctx.drawImage(video, 0, 0);
     
     canvas.toBlob((blob) => {
       if (!blob) return;
