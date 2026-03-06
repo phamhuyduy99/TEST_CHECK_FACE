@@ -11,6 +11,7 @@ server/node_modules/
 # Build outputs
 client/dist/
 client/build/
+server/dist/
 
 # Uploads
 server/uploads/
