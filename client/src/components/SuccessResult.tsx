@@ -1,4 +1,28 @@
-export default function SuccessResult({ uploadedUrls }) {
+interface UploadedUrls {
+  video: {
+    url: string;
+    publicId: string;
+    size: string;
+    duration: string;
+  };
+  image1: {
+    url: string;
+    publicId: string;
+    size: string;
+  };
+  image2: {
+    url: string;
+    publicId: string;
+    size: string;
+  };
+  message: string;
+}
+
+interface SuccessResultProps {
+  uploadedUrls: UploadedUrls | null;
+}
+
+export default function SuccessResult({ uploadedUrls }: SuccessResultProps) {
   if (!uploadedUrls) return null;
 
   return (

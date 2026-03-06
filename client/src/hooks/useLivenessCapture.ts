@@ -1,16 +1,16 @@
 import { useState, useRef, useEffect } from 'react';
 
 export default function useLivenessCapture() {
-  const videoRef = useRef(null);
-  const canvasRef = useRef(null);
-  const mediaRecorderRef = useRef(null);
-  const chunksRef = useRef([]);
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const chunksRef = useRef<BlobPart[]>([]);
   
-  const [stream, setStream] = useState(null);
+  const [stream, setStream] = useState<MediaStream | null>(null);
   const [recording, setRecording] = useState(false);
-  const [videoBlob, setVideoBlob] = useState(null);
-  const [image1, setImage1] = useState(null);
-  const [image2, setImage2] = useState(null);
+  const [videoBlob, setVideoBlob] = useState<Blob | null>(null);
+  const [image1, setImage1] = useState<Blob | null>(null);
+  const [image2, setImage2] = useState<Blob | null>(null);
   const [message, setMessage] = useState('');
 
   const startCamera = async () => {
@@ -68,7 +68,7 @@ export default function useLivenessCapture() {
     }
   };
 
-  const captureImage = (imageNumber) => {
+  const captureImage = (imageNumber: number) => {
     if (!videoRef.current) return;
     
     if (recording) {
@@ -94,6 +94,7 @@ export default function useLivenessCapture() {
     canvas.getContext('2d').drawImage(video, 0, 0);
     
     canvas.toBlob((blob) => {
+      if (!blob) return;
       if (imageNumber === 1) {
         setImage1(blob);
         setMessage(`Đã chụp ảnh 1 (${(blob.size / 1024).toFixed(0)} KB)`);
@@ -112,8 +113,12 @@ export default function useLivenessCapture() {
   };
 
   useEffect(() => {
-    return () => stopCamera();
-  }, []);
+    return () => {
+      if (stream) {
+        stream.getTracks().forEach(track => track.stop());
+      }
+    };
+  }, [stream]);
 
   return {
     videoRef,

@@ -2,14 +2,46 @@ import { useState } from 'react';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
 
+interface UploadedUrls {
+  video: {
+    url: string;
+    publicId: string;
+    size: string;
+    duration: string;
+  };
+  image1: {
+    url: string;
+    publicId: string;
+    size: string;
+  };
+  image2: {
+    url: string;
+    publicId: string;
+    size: string;
+  };
+  message: string;
+}
+
+interface ErrorState {
+  title: string;
+  message: string;
+  details: string[];
+}
+
 export default function useUpload() {
   const [uploading, setUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
-  const [uploadedUrls, setUploadedUrls] = useState(null);
-  const [error, setError] = useState(null);
+  const [uploadedUrls, setUploadedUrls] = useState<UploadedUrls | null>(null);
+  const [error, setError] = useState<ErrorState | null>(null);
   const [retryCount, setRetryCount] = useState(0);
 
-  const uploadData = async (videoBlob, image1, image2, setMessage, attempt = 1) => {
+  const uploadData = async (
+    videoBlob: Blob,
+    image1: Blob,
+    image2: Blob,
+    setMessage: (msg: string) => void,
+    attempt = 1
+  ): Promise<void> => {
     if (!videoBlob || !image1 || !image2) {
       setMessage('Vui lòng quay video và chụp đủ 2 ảnh trước khi gửi');
       return;
@@ -20,7 +52,7 @@ export default function useUpload() {
     setError(null);
     setRetryCount(attempt - 1);
     
-    let progressInterval;
+    let progressInterval: NodeJS.Timeout;
     const startProgress = () => {
       progressInterval = setInterval(() => {
         setUploadProgress(prev => {
@@ -58,7 +90,7 @@ export default function useUpload() {
       } else {
         throw new Error(result.error || 'Upload thất bại');
       }
-    } catch (err) {
+    } catch (err: any) {
       clearInterval(progressInterval);
       
       // Retry logic

@@ -1,4 +1,15 @@
-export default function ErrorAlert({ error, onClose }) {
+interface ErrorState {
+  title: string;
+  message: string;
+  details: string[];
+}
+
+interface ErrorAlertProps {
+  error: ErrorState | null;
+  onClose: () => void;
+}
+
+export default function ErrorAlert({ error, onClose }: ErrorAlertProps) {
   if (!error) return null;
 
   return (

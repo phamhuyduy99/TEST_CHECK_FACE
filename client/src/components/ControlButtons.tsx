@@ -1,3 +1,19 @@
+interface ControlButtonsProps {
+  stream: MediaStream | null;
+  recording: boolean;
+  videoBlob: Blob | null;
+  image1: Blob | null;
+  image2: Blob | null;
+  uploading: boolean;
+  onStartCamera: () => void;
+  onStopCamera: () => void;
+  onStartRecording: () => void;
+  onStopRecording: () => void;
+  onCaptureImage: (imageNumber: number) => void;
+  onUpload: () => void;
+  onResetRecording: () => void;
+}
+
 export default function ControlButtons({ 
   stream, 
   recording, 
@@ -12,7 +28,7 @@ export default function ControlButtons({
   onCaptureImage,
   onUpload,
   onResetRecording
-}) {
+}: ControlButtonsProps) {
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-3 mb-4">
       {!stream ? (

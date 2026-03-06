@@ -9,7 +9,12 @@ const INSTRUCTIONS = [
 
 const TOTAL_DURATION = INSTRUCTIONS.reduce((sum, inst) => sum + inst.duration, 0);
 
-export default function LivenessGuide({ isRecording, onComplete }) {
+interface LivenessGuideProps {
+  isRecording: boolean;
+  onComplete: () => void;
+}
+
+export default function LivenessGuide({ isRecording, onComplete }: LivenessGuideProps) {
   const [currentStep, setCurrentStep] = useState(0);
   const [timeLeft, setTimeLeft] = useState(Math.ceil(TOTAL_DURATION / 1000));
 
@@ -20,9 +25,8 @@ export default function LivenessGuide({ isRecording, onComplete }) {
       return;
     }
 
-    let stepTimer;
-    let countdownTimer;
-    let elapsedTime = 0;
+    let stepTimer: NodeJS.Timeout;
+    let countdownTimer: NodeJS.Timeout;
 
     // Đếm ngược tổng thời gian
     countdownTimer = setInterval(() => {
@@ -37,7 +41,7 @@ export default function LivenessGuide({ isRecording, onComplete }) {
     }, 1000);
 
     // Chuyển bước hướng dẫn
-    const scheduleNextStep = (stepIndex) => {
+    const scheduleNextStep = (stepIndex: number) => {
       if (stepIndex >= INSTRUCTIONS.length) return;
 
       stepTimer = setTimeout(() => {
