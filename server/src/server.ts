@@ -4,18 +4,20 @@ import multer from 'multer';
 import cors from 'cors';
 import { v2 as cloudinary, UploadApiResponse } from 'cloudinary';
 import { Readable } from 'stream';
+import { config } from './config';
 
 const app = express();
-const PORT = process.env.PORT || 3000;
 
-app.use(cors());
+app.use(cors({
+  origin: config.cors.origin
+}));
 app.use(express.json());
 
 // Cloudinary configuration
 cloudinary.config({
-  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
-  api_key: process.env.CLOUDINARY_API_KEY,
-  api_secret: process.env.CLOUDINARY_API_SECRET,
+  cloud_name: config.cloudinary.cloudName,
+  api_key: config.cloudinary.apiKey,
+  api_secret: config.cloudinary.apiSecret,
   timeout: 120000
 });
 
@@ -139,8 +141,9 @@ app.post(
   }
 );
 
-app.listen(PORT, () => {
-  console.log(`🚀 Server đang chạy tại http://localhost:${PORT}`);
-  console.log(`☁️  Cloudinary: ${process.env.CLOUDINARY_CLOUD_NAME || '⚠️  CHƯA CẤU HÌNH'}`);
-  console.log(`📤 Upload endpoint: http://localhost:${PORT}/api/upload`);
+app.listen(config.port, () => {
+  console.log(`🚀 Server running on port ${config.port}`);
+  console.log(`🌍 Environment: ${config.nodeEnv}`);
+  console.log(`☁️  Cloudinary: ${config.cloudinary.cloudName || '⚠️  CHƯA CẤU HÌNH'}`);
+  console.log(`📤 Upload endpoint: /api/upload`);
 });
