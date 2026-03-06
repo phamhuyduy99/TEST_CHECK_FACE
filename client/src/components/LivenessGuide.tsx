@@ -1,10 +1,10 @@
 import { useState, useEffect } from 'react';
 
 const INSTRUCTIONS = [
-  { text: '👈 Quay mặt sang TRÁI', duration: 1500 },
-  { text: '👉 Quay mặt sang PHẢI', duration: 1500 },
-  { text: '😊 MỈM CƯỜI', duration: 1000 },
-  { text: '😉 CHỚP MẮT', duration: 1000 },
+  { text: '👈 Quay mặt sang TRÁI', duration: 1500, speech: 'Quay mặt sang trái' },
+  { text: '👉 Quay mặt sang PHẢI', duration: 1500, speech: 'Quay mặt sang phải' },
+  { text: '😊 MỈM CƯỜI', duration: 1000, speech: 'Mỉm cười' },
+  { text: '😉 CHỚP MẮT', duration: 1000, speech: 'Chớp mắt' },
 ];
 
 const TOTAL_DURATION = INSTRUCTIONS.reduce((sum, inst) => sum + inst.duration, 0);
@@ -31,6 +31,15 @@ export default function LivenessGuide({ isRecording, onComplete }: LivenessGuide
   useEffect(() => {
     if (!isRecording) return;
 
+    const speak = (text: string) => {
+      if ('speechSynthesis' in window) {
+        const utterance = new SpeechSynthesisUtterance(text);
+        utterance.lang = 'vi-VN';
+        utterance.rate = 1.1;
+        speechSynthesis.speak(utterance);
+      }
+    };
+
     let stepTimer: ReturnType<typeof setTimeout>;
     const countdownTimer: ReturnType<typeof setInterval> = setInterval(() => {
       setTimeLeft(prev => {
@@ -46,6 +55,8 @@ export default function LivenessGuide({ isRecording, onComplete }: LivenessGuide
     // Chuyển bước hướng dẫn
     const scheduleNextStep = (stepIndex: number) => {
       if (stepIndex >= INSTRUCTIONS.length) return;
+
+      speak(INSTRUCTIONS[stepIndex].speech);
 
       stepTimer = setTimeout(() => {
         setCurrentStep(stepIndex + 1);
