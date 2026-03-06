@@ -63,7 +63,7 @@ export default function LivenessGuide({ isRecording, onComplete }: LivenessGuide
   const currentInstruction = INSTRUCTIONS[currentStep] || INSTRUCTIONS[INSTRUCTIONS.length - 1];
 
   return (
-    <div className="absolute inset-0 pointer-events-none flex flex-col items-center justify-center z-10">
+    <div className="absolute inset-0 pointer-events-none flex flex-col items-center justify-center z-50">
       {/* Hướng dẫn động tác */}
       <div className="bg-black bg-opacity-70 text-white px-6 py-4 rounded-2xl mb-4 animate-pulse">
         <p className="text-2xl sm:text-4xl font-bold text-center">
