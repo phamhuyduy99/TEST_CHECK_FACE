@@ -1,0 +1,22 @@
+#!/usr/bin/env sh
+. "$(dirname -- "$0")/_/husky.sh"
+
+echo "🔍 Checking TypeScript errors..."
+
+# Check client
+echo "📱 Checking client..."
+cd client && npm run type-check
+if [ $? -ne 0 ]; then
+  echo "❌ Client TypeScript errors found!"
+  exit 1
+fi
+
+# Check server
+echo "🖥️  Checking server..."
+cd ../server && npm run build
+if [ $? -ne 0 ]; then
+  echo "❌ Server TypeScript errors found!"
+  exit 1
+fi
+
+echo "✅ TypeScript check passed!"
