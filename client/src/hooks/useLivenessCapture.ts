@@ -5,7 +5,7 @@ export default function useLivenessCapture() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<BlobPart[]>([]);
-  
+
   const [stream, setStream] = useState<MediaStream | null>(null);
   const [recording, setRecording] = useState(false);
   const [videoBlob, setVideoBlob] = useState<Blob | null>(null);
@@ -15,9 +15,9 @@ export default function useLivenessCapture() {
 
   const startCamera = async () => {
     try {
-      const mediaStream = await navigator.mediaDevices.getUserMedia({ 
-        video: { facingMode: 'user' }, 
-        audio: false 
+      const mediaStream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: 'user' },
+        audio: false,
       });
       setStream(mediaStream);
       if (videoRef.current) {
@@ -40,21 +40,21 @@ export default function useLivenessCapture() {
 
   const startRecording = () => {
     if (!stream) return;
-    
+
     chunksRef.current = [];
     const mediaRecorder = new MediaRecorder(stream, { mimeType: 'video/webm' });
-    
-    mediaRecorder.ondataavailable = (e) => {
+
+    mediaRecorder.ondataavailable = e => {
       if (e.data.size > 0) chunksRef.current.push(e.data);
     };
-    
+
     mediaRecorder.onstop = () => {
       const blob = new Blob(chunksRef.current, { type: 'video/webm' });
       setVideoBlob(blob);
       setMessage(`Video đã được ghi lại (${(blob.size / 1024 / 1024).toFixed(2)} MB)`);
       setRecording(false);
     };
-    
+
     mediaRecorderRef.current = mediaRecorder;
     mediaRecorder.start(100);
     setRecording(true);
@@ -70,7 +70,7 @@ export default function useLivenessCapture() {
 
   const captureImage = (imageNumber: number) => {
     if (!videoRef.current) return;
-    
+
     if (recording) {
       setMessage('⚠️ Vui lòng dừng quay video trước khi chụp ảnh!');
       return;
@@ -85,28 +85,32 @@ export default function useLivenessCapture() {
       setMessage('⚠️ Vui lòng chụp ảnh 1 trước!');
       return;
     }
-    
+
     const canvas = canvasRef.current;
     const video = videoRef.current;
-    
+
     if (!canvas || !video) return;
-    
+
     canvas.width = video.videoWidth;
     canvas.height = video.videoHeight;
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
     ctx.drawImage(video, 0, 0);
-    
-    canvas.toBlob((blob) => {
-      if (!blob) return;
-      if (imageNumber === 1) {
-        setImage1(blob);
-        setMessage(`Đã chụp ảnh 1 (${(blob.size / 1024).toFixed(0)} KB)`);
-      } else {
-        setImage2(blob);
-        setMessage(`Đã chụp ảnh 2 (${(blob.size / 1024).toFixed(0)} KB)`);
-      }
-    }, 'image/jpeg', 0.95);
+
+    canvas.toBlob(
+      blob => {
+        if (!blob) return;
+        if (imageNumber === 1) {
+          setImage1(blob);
+          setMessage(`Đã chụp ảnh 1 (${(blob.size / 1024).toFixed(0)} KB)`);
+        } else {
+          setImage2(blob);
+          setMessage(`Đã chụp ảnh 2 (${(blob.size / 1024).toFixed(0)} KB)`);
+        }
+      },
+      'image/jpeg',
+      0.95
+    );
   };
 
   const resetRecording = () => {
@@ -139,6 +143,6 @@ export default function useLivenessCapture() {
     startRecording,
     stopRecording,
     captureImage,
-    resetRecording
+    resetRecording,
   };
 }

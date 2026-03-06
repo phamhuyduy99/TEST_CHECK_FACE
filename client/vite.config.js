@@ -1,6 +1,6 @@
-import { defineConfig } from 'vite'
-import react from '@vitejs/plugin-react'
-import checker from 'vite-plugin-checker'
+import { defineConfig } from 'vite';
+import react from '@vitejs/plugin-react';
+import checker from 'vite-plugin-checker';
 
 // https://vite.dev/config/
 export default defineConfig({
@@ -16,6 +16,6 @@ export default defineConfig({
   server: {
     port: 5173,
     open: true,
-    hmr: true
-  }
-})
+    hmr: true,
+  },
+});

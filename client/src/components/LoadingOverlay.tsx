@@ -11,23 +11,21 @@ export default function LoadingOverlay({ progress }: LoadingOverlayProps) {
           <h3 className="text-xl sm:text-2xl font-bold text-gray-800 mb-2">Đang upload...</h3>
           <p className="text-sm sm:text-base text-gray-600">Vui lòng chờ trong giây lát</p>
         </div>
-        
+
         <div className="mb-4">
           <div className="flex justify-between text-xs sm:text-sm text-gray-600 mb-2">
             <span>Tiến trình</span>
             <span className="font-semibold">{Math.round(progress)}%</span>
           </div>
           <div className="w-full bg-gray-200 rounded-full h-2 sm:h-3 overflow-hidden">
-            <div 
+            <div
               className="h-full bg-gradient-to-r from-indigo-500 to-purple-600 rounded-full transition-all duration-300 ease-out"
               style={{ width: `${progress}%` }}
             ></div>
           </div>
         </div>
-        
-        <div className="text-xs text-gray-500 text-center">
-          🌐 Đang upload lên Cloudinary...
-        </div>
+
+        <div className="text-xs text-gray-500 text-center">🌐 Đang upload lên Cloudinary...</div>
       </div>
     </div>
   );

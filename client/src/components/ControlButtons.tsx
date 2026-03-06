@@ -14,12 +14,12 @@ interface ControlButtonsProps {
   onResetRecording: () => void;
 }
 
-export default function ControlButtons({ 
-  stream, 
-  recording, 
-  videoBlob, 
-  image1, 
-  image2, 
+export default function ControlButtons({
+  stream,
+  recording,
+  videoBlob,
+  image1,
+  image2,
   uploading,
   onStartCamera,
   onStopCamera,
@@ -27,19 +27,19 @@ export default function ControlButtons({
   onStopRecording,
   onCaptureImage,
   onUpload,
-  onResetRecording
+  onResetRecording,
 }: ControlButtonsProps) {
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-3 mb-4">
       {!stream ? (
-        <button 
+        <button
           onClick={onStartCamera}
           className="col-span-1 sm:col-span-2 bg-green-600 text-white px-4 py-2.5 sm:py-3 rounded-lg hover:bg-green-700 text-sm sm:text-base font-medium cursor-pointer"
         >
           Bật Camera
         </button>
       ) : (
-        <button 
+        <button
           onClick={onStopCamera}
           className="col-span-1 sm:col-span-2 bg-red-600 text-white px-4 py-2.5 sm:py-3 rounded-lg hover:bg-red-700 text-sm sm:text-base font-medium cursor-pointer"
         >
@@ -48,7 +48,7 @@ export default function ControlButtons({
       )}
 
       {stream && !recording && !videoBlob && (
-        <button 
+        <button
           onClick={onStartRecording}
           className="col-span-1 sm:col-span-2 bg-blue-600 text-white px-4 py-2.5 sm:py-3 rounded-lg hover:bg-blue-700 text-sm sm:text-base font-medium cursor-pointer"
         >
@@ -57,7 +57,7 @@ export default function ControlButtons({
       )}
 
       {stream && videoBlob && (
-        <button 
+        <button
           onClick={onResetRecording}
           className="col-span-1 sm:col-span-2 bg-yellow-600 text-white px-4 py-2.5 sm:py-3 rounded-lg hover:bg-yellow-700 text-sm sm:text-base font-medium cursor-pointer"
         >
@@ -66,7 +66,7 @@ export default function ControlButtons({
       )}
 
       {recording && (
-        <button 
+        <button
           onClick={onStopRecording}
           className="col-span-1 sm:col-span-2 bg-orange-600 text-white px-4 py-2.5 sm:py-3 rounded-lg hover:bg-orange-700 text-sm sm:text-base font-medium cursor-pointer"
         >
@@ -76,14 +76,14 @@ export default function ControlButtons({
 
       {stream && (
         <>
-          <button 
+          <button
             onClick={() => onCaptureImage(1)}
             className="bg-purple-600 text-white px-4 py-2.5 sm:py-3 rounded-lg hover:bg-purple-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-sm sm:text-base font-medium cursor-pointer"
             disabled={recording || !videoBlob}
           >
             Chụp ảnh 1 {image1 && '✓'}
           </button>
-          <button 
+          <button
             onClick={() => onCaptureImage(2)}
             className="bg-purple-600 text-white px-4 py-2.5 sm:py-3 rounded-lg hover:bg-purple-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-sm sm:text-base font-medium cursor-pointer"
             disabled={recording || !videoBlob || !image1}
@@ -94,7 +94,7 @@ export default function ControlButtons({
       )}
 
       {videoBlob && image1 && image2 && (
-        <button 
+        <button
           onClick={onUpload}
           disabled={uploading}
           className="col-span-1 sm:col-span-2 bg-indigo-600 text-white px-4 py-2.5 sm:py-3 rounded-lg hover:bg-indigo-700 disabled:bg-gray-400 text-sm sm:text-base font-medium cursor-pointer"

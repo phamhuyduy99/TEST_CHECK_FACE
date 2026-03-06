@@ -8,6 +8,13 @@ if [ $? -ne 0 ]; then
   exit 1
 fi
 
+echo "🔍 Checking ESLint..."
+npm run lint
+if [ $? -ne 0 ]; then
+  echo "❌ Client ESLint errors found!"
+  exit 1
+fi
+
 # Check server
 echo "🖥️  Checking server..."
 cd ../server && npm run build
@@ -16,4 +23,4 @@ if [ $? -ne 0 ]; then
   exit 1
 fi
 
-echo "✅ TypeScript check passed!"
+echo "✅ All checks passed!"

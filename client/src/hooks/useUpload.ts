@@ -51,7 +51,7 @@ export default function useUpload() {
     setUploadProgress(0);
     setError(null);
     setRetryCount(attempt - 1);
-    
+
     let progressInterval: ReturnType<typeof setInterval> | undefined;
     const startProgress = () => {
       progressInterval = setInterval(() => {
@@ -76,12 +76,12 @@ export default function useUpload() {
       const response = await fetch(`${API_URL}/api/upload`, {
         method: 'POST',
         body: formData,
-        signal: controller.signal
+        signal: controller.signal,
       });
-      
+
       clearTimeout(timeoutId);
       if (progressInterval) clearInterval(progressInterval);
-      
+
       const result = await response.json();
       if (response.ok) {
         setUploadProgress(100);
@@ -90,9 +90,11 @@ export default function useUpload() {
       } else {
         throw new Error(result.error || 'Upload thất bại');
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       if (progressInterval) clearInterval(progressInterval);
-      
+
+      const error = err as Error & { name?: string };
+
       // Retry logic
       if (attempt < 3) {
         console.log(`🔄 Thử lại lần ${attempt + 1}/3...`);
@@ -100,23 +102,23 @@ export default function useUpload() {
         await new Promise(resolve => setTimeout(resolve, 2000));
         return uploadData(videoBlob, image1, image2, setMessage, attempt + 1);
       }
-      
+
       // Hết retry, hiển thị lỗi
       let errorDetails = [
         'Server đang chạy chưa? (npm run dev)',
         'Cấu hình Cloudinary đúng chưa?',
         'Kết nối mạng ổn định không?',
-        `Đã thử ${attempt} lần nhưng vẫn thất bại`
+        `Đã thử ${attempt} lần nhưng vẫn thất bại`,
       ];
 
-      if (err.name === 'AbortError') {
+      if (error.name === 'AbortError') {
         errorDetails = ['Upload quá lâu (timeout 2 phút)', 'Thử lại với kết nối mạng tốt hơn'];
       }
 
       setError({
         title: 'Lỗi kết nối',
         message: 'Không thể kết nối đến server. Vui lòng kiểm tra:',
-        details: errorDetails
+        details: errorDetails,
       });
     } finally {
       setTimeout(() => {
@@ -133,6 +135,6 @@ export default function useUpload() {
     error,
     retryCount,
     setError,
-    uploadData
+    uploadData,
   };
 }

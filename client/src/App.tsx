@@ -1,7 +1,7 @@
-import Camera from './Camera'
+import Camera from './Camera';
 
 function App() {
-  return <Camera />
+  return <Camera />;
 }
 
-export default App
+export default App;

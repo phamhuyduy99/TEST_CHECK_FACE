@@ -22,17 +22,10 @@ export default function Camera() {
     startRecording,
     stopRecording,
     captureImage,
-    resetRecording
+    resetRecording,
   } = useLivenessCapture();
 
-  const {
-    uploading,
-    uploadProgress,
-    uploadedUrls,
-    error,
-    setError,
-    uploadData
-  } = useUpload();
+  const { uploading, uploadProgress, uploadedUrls, error, setError, uploadData } = useUpload();
 
   const handleUpload = () => {
     if (videoBlob && image1 && image2) {
@@ -50,10 +43,10 @@ export default function Camera() {
         </h1>
 
         <div className="mb-4 relative">
-          <video 
-            ref={videoRef} 
-            autoPlay 
-            playsInline 
+          <video
+            ref={videoRef}
+            autoPlay
+            playsInline
             muted
             className="w-full rounded-lg bg-black aspect-video"
           />

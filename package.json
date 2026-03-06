@@ -5,6 +5,7 @@
   },
   "scripts": {
     "prepare": "husky",
-    "typecheck": "cd client && npm run type-check && cd ../server && npm run build"
+    "typecheck": "cd client && npm run type-check && cd ../server && npm run build",
+    "lint": "cd client && npm run lint"
   }
 }
