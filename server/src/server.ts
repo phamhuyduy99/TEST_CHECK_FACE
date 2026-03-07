@@ -9,7 +9,9 @@ import { config } from './config';
 const app = express();
 
 app.use(cors({
-  origin: config.cors.origin
+  origin: config.cors.origin,
+  methods: ['GET', 'POST', 'PUT', 'DELETE'],
+  credentials: true
 }));
 app.use(express.json());
 
@@ -79,13 +81,20 @@ app.post(
   ]),
   async (req: Request, res: Response) => {
     try {
-      console.log('📥 Nhận request upload');
+      console.log('📥 Nhận request upload từ:', req.headers.origin);
 
       const files = req.files as UploadFiles;
 
       if (!files?.video || !files?.image1 || !files?.image2) {
+        console.log('❌ Thiếu file:', { video: !!files?.video, image1: !!files?.image1, image2: !!files?.image2 });
         return res.status(400).json({ error: 'Thiếu file video hoặc ảnh' });
       }
+
+      console.log('📦 File sizes:', {
+        video: `${(files.video[0].size / 1024 / 1024).toFixed(2)} MB`,
+        image1: `${(files.image1[0].size / 1024).toFixed(0)} KB`,
+        image2: `${(files.image2[0].size / 1024).toFixed(0)} KB`
+      });
 
       // Upload video
       console.log('☁️  Đang upload video lên Cloudinary...');
@@ -128,7 +137,7 @@ app.post(
         message: 'Upload thành công lên Cloudinary'
       };
 
-      console.log('✅ Upload thành công:', result);
+      console.log('✅ Upload thành công!');
       res.json(result);
     } catch (error) {
       console.error('❌ Lỗi upload:', error);

@@ -61,35 +61,29 @@ export default function Camera() {
       const video = videoRef.current;
       overlayCanvasRef.width = video.videoWidth;
       overlayCanvasRef.height = video.videoHeight;
+      const ctx = overlayCanvasRef.getContext('2d');
 
       interval = setInterval(async () => {
-        // Chỉ dùng Face-API.js
         const faceApiDetection = await detectFace(video);
         const detected = !!faceApiDetection;
         setLiveDetection(detected);
 
-        // Track nếu đã từng detect được người trong video
         if (detected) {
           setFaceDetectedDuringRecording(true);
         }
 
-        if (faceApiDetection && overlayCanvasRef) {
-          const ctx = overlayCanvasRef.getContext('2d');
-          if (ctx) {
-            ctx.clearRect(0, 0, overlayCanvasRef.width, overlayCanvasRef.height);
-            // Vẽ bounding box
-            const box = faceApiDetection.detection.box;
-            ctx.strokeStyle = '#00ff00';
-            ctx.lineWidth = 3;
-            ctx.strokeRect(box.x, box.y, box.width, box.height);
-            // Vẽ landmarks
-            ctx.fillStyle = '#ff0000';
-            faceApiDetection.landmarkPositions.forEach((point: { x: number; y: number }) => {
-              ctx.beginPath();
-              ctx.arc(point.x, point.y, 2, 0, 2 * Math.PI);
-              ctx.fill();
-            });
-          }
+        if (faceApiDetection && ctx) {
+          ctx.clearRect(0, 0, overlayCanvasRef.width, overlayCanvasRef.height);
+          const box = faceApiDetection.detection.box;
+          ctx.strokeStyle = '#00ff00';
+          ctx.lineWidth = 3;
+          ctx.strokeRect(box.x, box.y, box.width, box.height);
+          ctx.fillStyle = '#ff0000';
+          faceApiDetection.landmarkPositions.forEach((point: { x: number; y: number }) => {
+            ctx.beginPath();
+            ctx.arc(point.x, point.y, 2, 0, 2 * Math.PI);
+            ctx.fill();
+          });
         }
       }, 1000);
     }
@@ -328,14 +322,19 @@ export default function Camera() {
         <SuccessResult uploadedUrls={uploadedUrls} />
       </div>
 
-      {/* Toggle Button */}
-      <button
-        onClick={() => setShowButtons(!showButtons)}
-        className="fixed bottom-4 right-4 bg-indigo-600 text-white p-3 rounded-full shadow-2xl z-50 hover:bg-indigo-700 transition-all"
-        title={showButtons ? 'Ẩn nút' : 'Hiện nút'}
-      >
-        {showButtons ? '👇' : '👆'}
-      </button>
+      {/* Toggle Button with Tooltip */}
+      <div className="fixed bottom-4 right-4 z-50 group">
+        <button
+          onClick={() => setShowButtons(!showButtons)}
+          className="bg-indigo-600 text-white p-4 rounded-full shadow-2xl hover:bg-indigo-700 hover:scale-110 transition-all text-2xl cursor-pointer"
+          aria-label={showButtons ? 'Ẩn bảng điều khiển' : 'Hiện bảng điều khiển'}
+        >
+          {showButtons ? '👇' : '👆'}
+        </button>
+        <div className="absolute bottom-full right-0 mb-2 px-3 py-2 bg-gray-900 text-white text-sm rounded-lg opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none">
+          {showButtons ? 'Ẩn bảng điều khiển' : 'Hiện bảng điều khiển'}
+        </div>
+      </div>
 
       {/* Sticky Control Buttons */}
       {showButtons && (
