@@ -1,6 +1,7 @@
 import useLivenessCapture from './hooks/useLivenessCapture';
 import useUpload from './hooks/useUpload';
 import useFaceDetection from './hooks/useFaceDetection';
+import useMediaPipeFaceDetection from './hooks/useMediaPipeFaceDetection';
 import LoadingOverlay from './components/LoadingOverlay';
 import ErrorAlert from './components/ErrorAlert';
 import SuccessResult from './components/SuccessResult';
@@ -48,30 +49,37 @@ export default function Camera() {
 
   const { uploading, uploadProgress, uploadedUrls, error, setError, uploadData } = useUpload();
   const { modelsLoaded, detectFace, compareFaces } = useFaceDetection();
+  const { mediaPipeLoaded, detectFaceMediaPipe } = useMediaPipeFaceDetection();
 
   useEffect(() => {
     let interval: ReturnType<typeof setInterval>;
-    if (recording && modelsLoaded && videoRef.current && overlayCanvasRef) {
+    if (recording && modelsLoaded && mediaPipeLoaded && videoRef.current && overlayCanvasRef) {
       const video = videoRef.current;
       overlayCanvasRef.width = video.videoWidth;
       overlayCanvasRef.height = video.videoHeight;
 
       interval = setInterval(async () => {
-        const detection = await detectFace(video);
-        setLiveDetection(!!detection);
+        // Dùng cả 2 models để tăng độ chính xác
+        const [faceApiDetection, mediaPipeDetection] = await Promise.all([
+          detectFace(video),
+          detectFaceMediaPipe(video),
+        ]);
 
-        if (detection && overlayCanvasRef) {
+        // Chỉ cần 1 trong 2 detect được là OK
+        setLiveDetection(!!faceApiDetection || mediaPipeDetection);
+
+        if (faceApiDetection && overlayCanvasRef) {
           const ctx = overlayCanvasRef.getContext('2d');
           if (ctx) {
             ctx.clearRect(0, 0, overlayCanvasRef.width, overlayCanvasRef.height);
             // Vẽ bounding box
-            const box = detection.detection.box;
+            const box = faceApiDetection.detection.box;
             ctx.strokeStyle = '#00ff00';
             ctx.lineWidth = 3;
             ctx.strokeRect(box.x, box.y, box.width, box.height);
             // Vẽ landmarks
             ctx.fillStyle = '#ff0000';
-            detection.landmarkPositions.forEach((point: { x: number; y: number }) => {
+            faceApiDetection.landmarkPositions.forEach((point: { x: number; y: number }) => {
               ctx.beginPath();
               ctx.arc(point.x, point.y, 2, 0, 2 * Math.PI);
               ctx.fill();
@@ -82,7 +90,7 @@ export default function Camera() {
     }
     return () => clearInterval(interval);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [recording, modelsLoaded]);
+  }, [recording, modelsLoaded, mediaPipeLoaded]);
 
   const handleCaptureWithDetection = async (imageNumber: number) => {
     if (!modelsLoaded || !videoRef.current) {
@@ -112,13 +120,13 @@ export default function Camera() {
           canvas.width = canvasRef.current.width;
           canvas.height = canvasRef.current.height;
           ctx.drawImage(canvasRef.current, 0, 0);
-          
+
           // Vẽ bounding box
           const box = detection.detection.box;
           ctx.strokeStyle = '#00ff00';
           ctx.lineWidth = 4;
           ctx.strokeRect(box.x, box.y, box.width, box.height);
-          
+
           setImagePreview1(canvas.toDataURL('image/jpeg'));
         }
       }
@@ -133,13 +141,13 @@ export default function Camera() {
           canvas.width = canvasRef.current.width;
           canvas.height = canvasRef.current.height;
           ctx.drawImage(canvasRef.current, 0, 0);
-          
+
           // Vẽ bounding box
           const box = detection.detection.box;
           ctx.strokeStyle = '#00ff00';
           ctx.lineWidth = 4;
           ctx.strokeRect(box.x, box.y, box.width, box.height);
-          
+
           setImagePreview2(canvas.toDataURL('image/jpeg'));
         }
       }
@@ -178,7 +186,12 @@ export default function Camera() {
 
       <div className="max-w-2xl mx-auto bg-white rounded-lg shadow-lg p-4 sm:p-6">
         <h1 className="text-2xl sm:text-3xl font-bold text-center mb-4 sm:mb-6 text-gray-800">
-          Kiểm tra Liveness Khuôn mặt {!modelsLoaded && '(Đang tải models...)'}
+          Kiểm tra Liveness Khuôn mặt
+          {(!modelsLoaded || !mediaPipeLoaded) && (
+            <span className="text-sm block mt-2 text-gray-600">
+              (Đang tải: {!modelsLoaded && 'Face-API'} {!mediaPipeLoaded && 'MediaPipe'}...)
+            </span>
+          )}
         </h1>
 
         <div className="mb-4 relative">
