@@ -104,16 +104,44 @@ export default function Camera() {
       setFaceDescriptor1(detection.descriptor);
       setFaceInfo1(detection);
       setMessage(`✅ Ảnh 1: Phát hiện khuôn mặt thành công!`);
-      
+
       if (canvasRef.current) {
-        setImagePreview1(canvasRef.current.toDataURL('image/jpeg'));
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d');
+        if (ctx) {
+          canvas.width = canvasRef.current.width;
+          canvas.height = canvasRef.current.height;
+          ctx.drawImage(canvasRef.current, 0, 0);
+          
+          // Vẽ bounding box
+          const box = detection.detection.box;
+          ctx.strokeStyle = '#00ff00';
+          ctx.lineWidth = 4;
+          ctx.strokeRect(box.x, box.y, box.width, box.height);
+          
+          setImagePreview1(canvas.toDataURL('image/jpeg'));
+        }
       }
     } else {
       setFaceInfo2(detection);
       setMessage(`✅ Ảnh 2: Phát hiện khuôn mặt thành công!`);
-      
+
       if (canvasRef.current) {
-        setImagePreview2(canvasRef.current.toDataURL('image/jpeg'));
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d');
+        if (ctx) {
+          canvas.width = canvasRef.current.width;
+          canvas.height = canvasRef.current.height;
+          ctx.drawImage(canvasRef.current, 0, 0);
+          
+          // Vẽ bounding box
+          const box = detection.detection.box;
+          ctx.strokeStyle = '#00ff00';
+          ctx.lineWidth = 4;
+          ctx.strokeRect(box.x, box.y, box.width, box.height);
+          
+          setImagePreview2(canvas.toDataURL('image/jpeg'));
+        }
       }
 
       if (faceDescriptor1) {
@@ -145,7 +173,7 @@ export default function Camera() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-100 p-2 sm:p-4">
+    <div className="min-h-screen bg-gray-100 p-2 sm:p-4 pb-32">
       {uploading && <LoadingOverlay progress={uploadProgress} />}
 
       <div className="max-w-2xl mx-auto bg-white rounded-lg shadow-lg p-4 sm:p-6">
@@ -240,33 +268,26 @@ export default function Camera() {
 
         <ErrorAlert error={error} onClose={() => setError(null)} />
         <SuccessResult uploadedUrls={uploadedUrls} />
+      </div>
 
-        <ControlButtons
-          stream={stream}
-          recording={recording}
-          videoBlob={videoBlob}
-          image1={image1}
-          image2={image2}
-          uploading={uploading}
-          onStartCamera={startCamera}
-          onStopCamera={stopCamera}
-          onStartRecording={startRecording}
-          onStopRecording={stopRecording}
-          onCaptureImage={handleCaptureWithDetection}
-          onUpload={handleUpload}
-          onResetRecording={handleReset}
-        />
-
-        <div className="text-xs sm:text-sm text-gray-600 bg-gray-50 p-3 sm:p-4 rounded">
-          <p className="font-semibold mb-2">Hướng dẫn:</p>
-          <ol className="list-decimal list-inside space-y-1">
-            <li>Nhấn "Bật Camera" và cho phép truy cập</li>
-            <li>Nhấn "Bắt đầu quay Liveness"</li>
-            <li>Thực hiện: quay mặt trái, phải, chớp mắt, cười</li>
-            <li>Nhấn "Dừng quay"</li>
-            <li>Chụp 2 ảnh khuôn mặt</li>
-            <li>Nhấn "Gửi dữ liệu lên Server"</li>
-          </ol>
+      {/* Sticky Control Buttons */}
+      <div className="fixed bottom-0 left-0 right-0 bg-white border-t-2 border-gray-200 shadow-2xl p-3 sm:p-4 z-40">
+        <div className="max-w-2xl mx-auto">
+          <ControlButtons
+            stream={stream}
+            recording={recording}
+            videoBlob={videoBlob}
+            image1={image1}
+            image2={image2}
+            uploading={uploading}
+            onStartCamera={startCamera}
+            onStopCamera={stopCamera}
+            onStartRecording={startRecording}
+            onStopRecording={stopRecording}
+            onCaptureImage={handleCaptureWithDetection}
+            onUpload={handleUpload}
+            onResetRecording={handleReset}
+          />
         </div>
       </div>
     </div>
