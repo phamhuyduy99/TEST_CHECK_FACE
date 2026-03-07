@@ -1,6 +1,7 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import checker from 'vite-plugin-checker';
+import { visualizer } from 'rollup-plugin-visualizer';
 
 // https://vite.dev/config/
 export default defineConfig({
@@ -12,10 +13,34 @@ export default defineConfig({
         initialIsOpen: true,
       },
     }),
+    visualizer({
+      filename: './dist/stats.html',
+      open: false,
+      gzipSize: true,
+    }),
   ],
   server: {
     port: 5173,
     open: true,
     hmr: true,
+  },
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          'react-vendor': ['react', 'react-dom'],
+          'face-detection': ['face-api.js', '@mediapipe/face_detection', '@mediapipe/camera_utils'],
+        },
+      },
+    },
+    chunkSizeWarningLimit: 1000,
+    sourcemap: false,
+    minify: 'terser',
+    terserOptions: {
+      compress: {
+        drop_console: true,
+        drop_debugger: true,
+      },
+    },
   },
 });
