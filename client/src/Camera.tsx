@@ -31,6 +31,7 @@ export default function Camera() {
   const [imagePreview2, setImagePreview2] = useState<string>('');
   const [videoPreview, setVideoPreview] = useState<string>('');
   const [faceDetectedDuringRecording, setFaceDetectedDuringRecording] = useState(false);
+  const [showButtons, setShowButtons] = useState(true);
   const {
     videoRef,
     canvasRef,
@@ -95,6 +96,15 @@ export default function Camera() {
     return () => clearInterval(interval);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [recording, modelsLoaded]);
+
+  useEffect(() => {
+    if (videoBlob) {
+      const url = URL.createObjectURL(videoBlob);
+      setVideoPreview(url);
+      setMessage('✅ Video đã lưu thành công! Phát hiện người trong video.');
+      return () => URL.revokeObjectURL(url);
+    }
+  }, [videoBlob]);
 
   const handleCaptureWithDetection = async (imageNumber: number) => {
     if (!modelsLoaded || !videoRef.current) {
@@ -185,20 +195,11 @@ export default function Camera() {
       setMessage('❌ KHÔNG PHÁT HIỆN NGƯỜI TRONG VIDEO! Video không được lưu. Vui lòng quay lại.');
       stopRecording();
       setFaceDetectedDuringRecording(false);
+      setVideoPreview('');
       return;
     }
-    
+
     stopRecording();
-    
-    // Tạo video preview
-    setTimeout(() => {
-      if (videoBlob) {
-        const url = URL.createObjectURL(videoBlob);
-        setVideoPreview(url);
-        setMessage('✅ Video đã lưu thành công! Phát hiện người trong video.');
-      }
-    }, 100);
-    
     setFaceDetectedDuringRecording(false);
   };
 
@@ -327,26 +328,37 @@ export default function Camera() {
         <SuccessResult uploadedUrls={uploadedUrls} />
       </div>
 
+      {/* Toggle Button */}
+      <button
+        onClick={() => setShowButtons(!showButtons)}
+        className="fixed bottom-4 right-4 bg-indigo-600 text-white p-3 rounded-full shadow-2xl z-50 hover:bg-indigo-700 transition-all"
+        title={showButtons ? 'Ẩn nút' : 'Hiện nút'}
+      >
+        {showButtons ? '👇' : '👆'}
+      </button>
+
       {/* Sticky Control Buttons */}
-      <div className="fixed bottom-0 left-0 right-0 bg-white border-t-2 border-gray-200 shadow-2xl p-3 sm:p-4 z-40">
-        <div className="max-w-2xl mx-auto">
-          <ControlButtons
-            stream={stream}
-            recording={recording}
-            videoBlob={videoBlob}
-            image1={image1}
-            image2={image2}
-            uploading={uploading || !modelsLoaded}
-            onStartCamera={startCamera}
-            onStopCamera={stopCamera}
-            onStartRecording={startRecording}
-            onStopRecording={handleStopRecording}
-            onCaptureImage={handleCaptureWithDetection}
-            onUpload={handleUpload}
-            onResetRecording={handleReset}
-          />
+      {showButtons && (
+        <div className="fixed bottom-0 left-0 right-0 bg-white border-t-2 border-gray-200 shadow-2xl p-3 sm:p-4 z-40">
+          <div className="max-w-2xl mx-auto">
+            <ControlButtons
+              stream={stream}
+              recording={recording}
+              videoBlob={videoBlob}
+              image1={image1}
+              image2={image2}
+              uploading={uploading || !modelsLoaded}
+              onStartCamera={startCamera}
+              onStopCamera={stopCamera}
+              onStartRecording={startRecording}
+              onStopRecording={handleStopRecording}
+              onCaptureImage={handleCaptureWithDetection}
+              onUpload={handleUpload}
+              onResetRecording={handleReset}
+            />
+          </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }
