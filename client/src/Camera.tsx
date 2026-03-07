@@ -29,6 +29,8 @@ export default function Camera() {
   const [overlayCanvasRef] = useState<HTMLCanvasElement | null>(document.createElement('canvas'));
   const [imagePreview1, setImagePreview1] = useState<string>('');
   const [imagePreview2, setImagePreview2] = useState<string>('');
+  const [videoPreview, setVideoPreview] = useState<string>('');
+  const [faceDetectedDuringRecording, setFaceDetectedDuringRecording] = useState(false);
   const {
     videoRef,
     canvasRef,
@@ -66,7 +68,13 @@ export default function Camera() {
         ]);
 
         // Chỉ cần 1 trong 2 detect được là OK
-        setLiveDetection(!!faceApiDetection || mediaPipeDetection);
+        const detected = !!faceApiDetection || mediaPipeDetection;
+        setLiveDetection(detected);
+        
+        // Track nếu đã từng detect được người trong video
+        if (detected) {
+          setFaceDetectedDuringRecording(true);
+        }
 
         if (faceApiDetection && overlayCanvasRef) {
           const ctx = overlayCanvasRef.getContext('2d');
@@ -172,6 +180,30 @@ export default function Camera() {
     setLiveDetection(false);
     setImagePreview1('');
     setImagePreview2('');
+    setVideoPreview('');
+    setFaceDetectedDuringRecording(false);
+  };
+
+  const handleStopRecording = () => {
+    if (!faceDetectedDuringRecording) {
+      setMessage('❌ KHÔNG PHÁT HIỆN NGƯỜI TRONG VIDEO! Video không được lưu. Vui lòng quay lại.');
+      stopRecording();
+      setFaceDetectedDuringRecording(false);
+      return;
+    }
+    
+    stopRecording();
+    
+    // Tạo video preview
+    setTimeout(() => {
+      if (videoBlob) {
+        const url = URL.createObjectURL(videoBlob);
+        setVideoPreview(url);
+        setMessage('✅ Video đã lưu thành công! Phát hiện người trong video.');
+      }
+    }, 100);
+    
+    setFaceDetectedDuringRecording(false);
   };
 
   const handleUpload = () => {
@@ -237,7 +269,7 @@ export default function Camera() {
               {liveDetection ? '✅ Phát hiện người' : '⚠️ Không thấy người'}
             </div>
           )}
-          <LivenessGuide isRecording={recording} onComplete={stopRecording} />
+          <LivenessGuide isRecording={recording} onComplete={handleStopRecording} />
           <canvas ref={canvasRef} className="hidden" />
         </div>
 
@@ -287,6 +319,17 @@ export default function Camera() {
           </div>
         )}
 
+        {videoPreview && (
+          <div className="mb-4">
+            <h3 className="font-bold text-lg mb-2 text-gray-800">🎥 Video Liveness đã quay:</h3>
+            <video
+              src={videoPreview}
+              controls
+              className="w-full rounded-lg border-2 border-blue-500 shadow-lg"
+            />
+          </div>
+        )}
+
         <ErrorAlert error={error} onClose={() => setError(null)} />
         <SuccessResult uploadedUrls={uploadedUrls} />
       </div>
@@ -304,7 +347,7 @@ export default function Camera() {
             onStartCamera={startCamera}
             onStopCamera={stopCamera}
             onStartRecording={startRecording}
-            onStopRecording={stopRecording}
+            onStopRecording={handleStopRecording}
             onCaptureImage={handleCaptureWithDetection}
             onUpload={handleUpload}
             onResetRecording={handleReset}
