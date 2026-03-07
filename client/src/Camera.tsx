@@ -6,11 +6,21 @@ import ErrorAlert from './components/ErrorAlert';
 import SuccessResult from './components/SuccessResult';
 import ControlButtons from './components/ControlButtons';
 import LivenessGuide from './components/LivenessGuide';
-import { useState } from 'react';
+import FaceInfo from './components/FaceInfo';
+import { useState, useEffect } from 'react';
+
+interface FaceDetectionInfo {
+  confidence: number;
+  landmarks: number;
+  descriptor: Float32Array;
+}
 
 export default function Camera() {
   const [faceDescriptor1, setFaceDescriptor1] = useState<Float32Array | null>(null);
   const [faceMatchResult, setFaceMatchResult] = useState<string>('');
+  const [faceInfo1, setFaceInfo1] = useState<FaceDetectionInfo | null>(null);
+  const [faceInfo2, setFaceInfo2] = useState<FaceDetectionInfo | null>(null);
+  const [liveDetection, setLiveDetection] = useState<boolean>(false);
   const {
     videoRef,
     canvasRef,
@@ -32,30 +42,48 @@ export default function Camera() {
   const { uploading, uploadProgress, uploadedUrls, error, setError, uploadData } = useUpload();
   const { modelsLoaded, detectFace, compareFaces } = useFaceDetection();
 
-  const handleCaptureWithDetection = async (imageNumber: number) => {
-    captureImage(imageNumber);
+  useEffect(() => {
+    let interval: ReturnType<typeof setInterval>;
+    if (recording && modelsLoaded && videoRef.current) {
+      interval = setInterval(async () => {
+        const detection = await detectFace(videoRef.current!);
+        setLiveDetection(!!detection);
+      }, 1000);
+    }
+    return () => clearInterval(interval);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [recording, modelsLoaded]);
 
-    if (!modelsLoaded || !videoRef.current) return;
+  const handleCaptureWithDetection = async (imageNumber: number) => {
+    if (!modelsLoaded || !videoRef.current) {
+      setMessage('⚠️ Models chưa load xong!');
+      return;
+    }
 
     const detection = await detectFace(videoRef.current);
-    if (detection) {
-      if (imageNumber === 1) {
-        setFaceDescriptor1(detection.descriptor);
-        setMessage(`✅ Ảnh 1: Phát hiện khuôn mặt thành công!`);
-      } else {
-        setMessage(`✅ Ảnh 2: Phát hiện khuôn mặt thành công!`);
+    if (!detection) {
+      setMessage(`❌ Không phát hiện khuôn mặt! Vui lòng đảm bảo khuôn mặt trong khung hình.`);
+      return;
+    }
 
-        if (faceDescriptor1) {
-          const result = compareFaces(faceDescriptor1, detection.descriptor);
-          const matchText = result.match
-            ? `✅ Khớp! Độ tương đồng: ${(result.similarity * 100).toFixed(1)}%`
-            : `❌ Không khớp! Độ tương đồng: ${(result.similarity * 100).toFixed(1)}%`;
-          setFaceMatchResult(matchText);
-          setMessage(matchText);
-        }
-      }
+    captureImage(imageNumber);
+
+    if (imageNumber === 1) {
+      setFaceDescriptor1(detection.descriptor);
+      setFaceInfo1(detection);
+      setMessage(`✅ Ảnh 1: Phát hiện khuôn mặt thành công!`);
     } else {
-      setMessage(`⚠️ Không phát hiện được khuôn mặt trong ảnh ${imageNumber}`);
+      setFaceInfo2(detection);
+      setMessage(`✅ Ảnh 2: Phát hiện khuôn mặt thành công!`);
+
+      if (faceDescriptor1) {
+        const result = compareFaces(faceDescriptor1, detection.descriptor);
+        const matchText = result.match
+          ? `✅ Khớp! Độ tương đồng: ${(result.similarity * 100).toFixed(1)}%`
+          : `❌ Không khớp! Độ tương đồng: ${(result.similarity * 100).toFixed(1)}%`;
+        setFaceMatchResult(matchText);
+        setMessage(matchText);
+      }
     }
   };
 
@@ -63,6 +91,9 @@ export default function Camera() {
     resetRecording();
     setFaceDescriptor1(null);
     setFaceMatchResult('');
+    setFaceInfo1(null);
+    setFaceInfo2(null);
+    setLiveDetection(false);
   };
 
   const handleUpload = () => {
@@ -88,6 +119,15 @@ export default function Camera() {
             muted
             className="w-full rounded-lg bg-black aspect-video"
           />
+          {recording && (
+            <div
+              className={`absolute top-4 right-4 px-3 py-1 rounded-full text-sm font-bold ${
+                liveDetection ? 'bg-green-500 text-white' : 'bg-red-500 text-white'
+              }`}
+            >
+              {liveDetection ? '👤 Phát hiện người' : '⚠️ Không thấy người'}
+            </div>
+          )}
           <LivenessGuide isRecording={recording} onComplete={stopRecording} />
           <canvas ref={canvasRef} className="hidden" />
         </div>
@@ -97,6 +137,9 @@ export default function Camera() {
             {message}
           </div>
         )}
+
+        <FaceInfo detection={faceInfo1} imageNumber={1} />
+        <FaceInfo detection={faceInfo2} imageNumber={2} />
 
         {faceMatchResult && (
           <div

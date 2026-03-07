@@ -34,7 +34,14 @@ export default function useFaceDetection() {
         .withFaceLandmarks()
         .withFaceDescriptor();
 
-      return detection;
+      if (detection) {
+        return {
+          ...detection,
+          confidence: detection.detection.score,
+          landmarks: detection.landmarks.positions.length,
+        };
+      }
+      return null;
     } catch (err) {
       console.error('Error detecting face:', err);
       return null;
