@@ -1,11 +1,13 @@
 {
   "devDependencies": {
+    "concurrently": "^9.2.1",
     "husky": "^9.1.7",
     "lint-staged": "^16.3.2"
   },
   "scripts": {
     "prepare": "husky",
     "typecheck": "cd client && npm run type-check && cd ../server && npm run build",
-    "lint": "cd client && npm run lint"
+    "lint": "cd client && npm run lint",
+    "dev": "concurrently \"npm run dev --prefix server\" \"npm run dev --prefix client\" --names \"SERVER,CLIENT\" --prefix-colors \"blue,green\""
   }
 }
