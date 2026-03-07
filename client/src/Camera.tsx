@@ -26,6 +26,8 @@ export default function Camera() {
   const [faceInfo2, setFaceInfo2] = useState<FaceDetectionInfo | null>(null);
   const [liveDetection, setLiveDetection] = useState<boolean>(false);
   const [overlayCanvasRef] = useState<HTMLCanvasElement | null>(document.createElement('canvas'));
+  const [imagePreview1, setImagePreview1] = useState<string>('');
+  const [imagePreview2, setImagePreview2] = useState<string>('');
   const {
     videoRef,
     canvasRef,
@@ -102,9 +104,17 @@ export default function Camera() {
       setFaceDescriptor1(detection.descriptor);
       setFaceInfo1(detection);
       setMessage(`✅ Ảnh 1: Phát hiện khuôn mặt thành công!`);
+      
+      if (canvasRef.current) {
+        setImagePreview1(canvasRef.current.toDataURL('image/jpeg'));
+      }
     } else {
       setFaceInfo2(detection);
       setMessage(`✅ Ảnh 2: Phát hiện khuôn mặt thành công!`);
+      
+      if (canvasRef.current) {
+        setImagePreview2(canvasRef.current.toDataURL('image/jpeg'));
+      }
 
       if (faceDescriptor1) {
         const result = compareFaces(faceDescriptor1, detection.descriptor);
@@ -124,6 +134,8 @@ export default function Camera() {
     setFaceInfo1(null);
     setFaceInfo2(null);
     setLiveDetection(false);
+    setImagePreview1('');
+    setImagePreview2('');
   };
 
   const handleUpload = () => {
@@ -193,7 +205,26 @@ export default function Camera() {
         )}
 
         <FaceInfo detection={faceInfo1} imageNumber={1} />
+        {imagePreview1 && (
+          <div className="mb-4">
+            <img
+              src={imagePreview1}
+              alt="Ảnh 1"
+              className="w-full rounded-lg border-2 border-green-500 shadow-lg"
+            />
+          </div>
+        )}
+
         <FaceInfo detection={faceInfo2} imageNumber={2} />
+        {imagePreview2 && (
+          <div className="mb-4">
+            <img
+              src={imagePreview2}
+              alt="Ảnh 2"
+              className="w-full rounded-lg border-2 border-green-500 shadow-lg"
+            />
+          </div>
+        )}
 
         {faceMatchResult && (
           <div
