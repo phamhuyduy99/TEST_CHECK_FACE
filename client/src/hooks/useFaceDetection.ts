@@ -39,6 +39,7 @@ export default function useFaceDetection() {
           ...detection,
           confidence: detection.detection.score,
           landmarks: detection.landmarks.positions.length,
+          landmarkPositions: detection.landmarks.positions,
         };
       }
       return null;

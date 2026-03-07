@@ -13,6 +13,10 @@ interface FaceDetectionInfo {
   confidence: number;
   landmarks: number;
   descriptor: Float32Array;
+  detection: {
+    box: { x: number; y: number; width: number; height: number };
+  };
+  landmarkPositions: Array<{ x: number; y: number }>;
 }
 
 export default function Camera() {
@@ -21,6 +25,7 @@ export default function Camera() {
   const [faceInfo1, setFaceInfo1] = useState<FaceDetectionInfo | null>(null);
   const [faceInfo2, setFaceInfo2] = useState<FaceDetectionInfo | null>(null);
   const [liveDetection, setLiveDetection] = useState<boolean>(false);
+  const [overlayCanvasRef] = useState<HTMLCanvasElement | null>(document.createElement('canvas'));
   const {
     videoRef,
     canvasRef,
@@ -44,10 +49,33 @@ export default function Camera() {
 
   useEffect(() => {
     let interval: ReturnType<typeof setInterval>;
-    if (recording && modelsLoaded && videoRef.current) {
+    if (recording && modelsLoaded && videoRef.current && overlayCanvasRef) {
+      const video = videoRef.current;
+      overlayCanvasRef.width = video.videoWidth;
+      overlayCanvasRef.height = video.videoHeight;
+
       interval = setInterval(async () => {
-        const detection = await detectFace(videoRef.current!);
+        const detection = await detectFace(video);
         setLiveDetection(!!detection);
+
+        if (detection && overlayCanvasRef) {
+          const ctx = overlayCanvasRef.getContext('2d');
+          if (ctx) {
+            ctx.clearRect(0, 0, overlayCanvasRef.width, overlayCanvasRef.height);
+            // Vẽ bounding box
+            const box = detection.detection.box;
+            ctx.strokeStyle = '#00ff00';
+            ctx.lineWidth = 3;
+            ctx.strokeRect(box.x, box.y, box.width, box.height);
+            // Vẽ landmarks
+            ctx.fillStyle = '#ff0000';
+            detection.landmarkPositions.forEach((point: { x: number; y: number }) => {
+              ctx.beginPath();
+              ctx.arc(point.x, point.y, 2, 0, 2 * Math.PI);
+              ctx.fill();
+            });
+          }
+        }
       }, 1000);
     }
     return () => clearInterval(interval);
@@ -62,7 +90,9 @@ export default function Camera() {
 
     const detection = await detectFace(videoRef.current);
     if (!detection) {
-      setMessage(`❌ Không phát hiện khuôn mặt! Vui lòng đảm bảo khuôn mặt trong khung hình.`);
+      setMessage(
+        '🚨 KHÔNG PHÁT HIỆN KHUÔN MẶT! Vui lòng đảm bảo khuôn mặt rõ ràng trong khung hình.'
+      );
       return;
     }
 
@@ -119,13 +149,31 @@ export default function Camera() {
             muted
             className="w-full rounded-lg bg-black aspect-video"
           />
+          {recording && overlayCanvasRef && (
+            <canvas
+              ref={el => {
+                if (el && overlayCanvasRef) {
+                  el.width = overlayCanvasRef.width;
+                  el.height = overlayCanvasRef.height;
+                  const ctx = el.getContext('2d');
+                  const overlayCtx = overlayCanvasRef.getContext('2d');
+                  if (ctx && overlayCtx) {
+                    ctx.drawImage(overlayCanvasRef, 0, 0);
+                  }
+                }
+              }}
+              className="absolute top-0 left-0 w-full h-full pointer-events-none"
+            />
+          )}
           {recording && (
             <div
-              className={`absolute top-4 right-4 px-3 py-1 rounded-full text-sm font-bold ${
-                liveDetection ? 'bg-green-500 text-white' : 'bg-red-500 text-white'
+              className={`absolute top-4 right-4 px-4 py-3 rounded-full font-bold shadow-xl transition-all ${
+                liveDetection
+                  ? 'bg-green-500 text-white text-base sm:text-lg'
+                  : 'bg-red-600 text-white text-lg sm:text-xl animate-bounce'
               }`}
             >
-              {liveDetection ? '👤 Phát hiện người' : '⚠️ Không thấy người'}
+              {liveDetection ? '✅ Phát hiện người' : '⚠️ Không thấy người'}
             </div>
           )}
           <LivenessGuide isRecording={recording} onComplete={stopRecording} />
@@ -133,7 +181,13 @@ export default function Camera() {
         </div>
 
         {message && (
-          <div className="mb-4 p-3 bg-blue-100 text-blue-800 rounded text-sm sm:text-base">
+          <div
+            className={`mb-4 p-4 rounded-lg font-bold ${
+              message.includes('KHÔNG PHÁT HIỆN')
+                ? 'bg-red-100 border-4 border-red-600 text-red-900 text-lg sm:text-xl animate-pulse shadow-lg'
+                : 'bg-blue-100 text-blue-800 text-sm sm:text-base'
+            }`}
+          >
             {message}
           </div>
         )}
