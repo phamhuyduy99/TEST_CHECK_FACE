@@ -17,15 +17,17 @@
     "node": ">=18.0.0"
   },
   "dependencies": {
+    "@types/cors": "^2.8.19",
+    "@types/express": "^5.0.6",
+    "@types/multer": "^2.1.0",
+    "@types/node": "^25.3.5",
+    "@vladmandic/face-api": "^1.7.15",
+    "canvas": "^3.2.1",
     "cloudinary": "^2.9.0",
     "cors": "^2.8.6",
     "dotenv": "^17.3.1",
     "express": "^5.2.1",
     "multer": "^2.1.1",
-    "@types/cors": "^2.8.19",
-    "@types/express": "^5.0.6",
-    "@types/multer": "^2.1.0",
-    "@types/node": "^25.3.5",
     "typescript": "^5.9.3"
   },
   "devDependencies": {
