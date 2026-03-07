@@ -187,12 +187,20 @@ export default function Camera() {
       <div className="max-w-2xl mx-auto bg-white rounded-lg shadow-lg p-4 sm:p-6">
         <h1 className="text-2xl sm:text-3xl font-bold text-center mb-4 sm:mb-6 text-gray-800">
           Kiểm tra Liveness Khuôn mặt
-          {(!modelsLoaded || !mediaPipeLoaded) && (
-            <span className="text-sm block mt-2 text-gray-600">
-              (Đang tải: {!modelsLoaded && 'Face-API'} {!mediaPipeLoaded && 'MediaPipe'}...)
-            </span>
-          )}
         </h1>
+
+        {(!modelsLoaded || !mediaPipeLoaded) && (
+          <div className="mb-4 p-4 bg-yellow-100 border-2 border-yellow-500 rounded-lg text-center">
+            <div className="flex items-center justify-center gap-2 mb-2">
+              <div className="animate-spin rounded-full h-5 w-5 border-2 border-yellow-600 border-t-transparent"></div>
+              <p className="font-bold text-yellow-800">Đang tải AI Models...</p>
+            </div>
+            <p className="text-sm text-yellow-700">
+              {!modelsLoaded && '• Face-API.js '}
+              {!mediaPipeLoaded && '• MediaPipe (Google)'}
+            </p>
+          </div>
+        )}
 
         <div className="mb-4 relative">
           <video
@@ -292,7 +300,7 @@ export default function Camera() {
             videoBlob={videoBlob}
             image1={image1}
             image2={image2}
-            uploading={uploading}
+            uploading={uploading || !modelsLoaded || !mediaPipeLoaded}
             onStartCamera={startCamera}
             onStopCamera={stopCamera}
             onStartRecording={startRecording}
