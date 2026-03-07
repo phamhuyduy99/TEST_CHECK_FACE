@@ -1,7 +1,7 @@
 import useLivenessCapture from './hooks/useLivenessCapture';
 import useUpload from './hooks/useUpload';
 import useFaceDetection from './hooks/useFaceDetection';
-import useMediaPipeFaceDetection from './hooks/useMediaPipeFaceDetection';
+// import useMediaPipeFaceDetection from './hooks/useMediaPipeFaceDetection';
 import LoadingOverlay from './components/LoadingOverlay';
 import ErrorAlert from './components/ErrorAlert';
 import SuccessResult from './components/SuccessResult';
@@ -51,26 +51,22 @@ export default function Camera() {
 
   const { uploading, uploadProgress, uploadedUrls, error, setError, uploadData } = useUpload();
   const { modelsLoaded, detectFace, compareFaces } = useFaceDetection();
-  const { mediaPipeLoaded, detectFaceMediaPipe } = useMediaPipeFaceDetection();
+  // Skip MediaPipe - chỉ dùng Face-API.js (nhanh hơn)
+  // const { mediaPipeLoaded, detectFaceMediaPipe } = useMediaPipeFaceDetection();
 
   useEffect(() => {
     let interval: ReturnType<typeof setInterval>;
-    if (recording && modelsLoaded && mediaPipeLoaded && videoRef.current && overlayCanvasRef) {
+    if (recording && modelsLoaded && videoRef.current && overlayCanvasRef) {
       const video = videoRef.current;
       overlayCanvasRef.width = video.videoWidth;
       overlayCanvasRef.height = video.videoHeight;
 
       interval = setInterval(async () => {
-        // Dùng cả 2 models để tăng độ chính xác
-        const [faceApiDetection, mediaPipeDetection] = await Promise.all([
-          detectFace(video),
-          detectFaceMediaPipe(video),
-        ]);
-
-        // Chỉ cần 1 trong 2 detect được là OK
-        const detected = !!faceApiDetection || mediaPipeDetection;
+        // Chỉ dùng Face-API.js
+        const faceApiDetection = await detectFace(video);
+        const detected = !!faceApiDetection;
         setLiveDetection(detected);
-        
+
         // Track nếu đã từng detect được người trong video
         if (detected) {
           setFaceDetectedDuringRecording(true);
@@ -98,7 +94,7 @@ export default function Camera() {
     }
     return () => clearInterval(interval);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [recording, modelsLoaded, mediaPipeLoaded]);
+  }, [recording, modelsLoaded]);
 
   const handleCaptureWithDetection = async (imageNumber: number) => {
     if (!modelsLoaded || !videoRef.current) {
@@ -221,16 +217,13 @@ export default function Camera() {
           Kiểm tra Liveness Khuôn mặt
         </h1>
 
-        {(!modelsLoaded || !mediaPipeLoaded) && (
+        {!modelsLoaded && (
           <div className="mb-4 p-4 bg-yellow-100 border-2 border-yellow-500 rounded-lg text-center">
             <div className="flex items-center justify-center gap-2 mb-2">
               <div className="animate-spin rounded-full h-5 w-5 border-2 border-yellow-600 border-t-transparent"></div>
               <p className="font-bold text-yellow-800">Đang tải AI Models...</p>
             </div>
-            <p className="text-sm text-yellow-700">
-              {!modelsLoaded && '• Face-API.js '}
-              {!mediaPipeLoaded && '• MediaPipe (Google)'}
-            </p>
+            <p className="text-sm text-yellow-700">• Face-API.js (Nhận diện khuôn mặt)</p>
           </div>
         )}
 
@@ -343,7 +336,7 @@ export default function Camera() {
             videoBlob={videoBlob}
             image1={image1}
             image2={image2}
-            uploading={uploading || !modelsLoaded || !mediaPipeLoaded}
+            uploading={uploading || !modelsLoaded}
             onStartCamera={startCamera}
             onStopCamera={stopCamera}
             onStartRecording={startRecording}
