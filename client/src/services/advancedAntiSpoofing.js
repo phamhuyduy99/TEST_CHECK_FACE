@@ -2,6 +2,7 @@
  * Advanced Anti-Spoofing Service
  * Bổ sung 5 giải pháp mạnh mẽ chống video replay
  */
+import MobileDetect from 'mobile-detect';
 
 class AdvancedAntiSpoofingService {
   constructor() {
@@ -34,6 +35,10 @@ class AdvancedAntiSpoofingService {
     this.currentChallenge = null;
     this.challengeStartTime = 0;
     this.completedChallenges = [];
+    
+    // Detect device
+    const md = new MobileDetect(window.navigator.userAgent);
+    this.isMobile = !!md.mobile();
   }
 
   /**
@@ -78,13 +83,14 @@ class AdvancedAntiSpoofingService {
 
     // Tính score dựa trên số lần chớp mắt
     const blinkCount = this.blinkHistory.length;
-    const score = Math.min(1.0, blinkCount / 2); // Giảm từ 3 → 2 lần
+    const requiredBlinks = this.isMobile ? 2 : 3;
+    const score = Math.min(1.0, blinkCount / requiredBlinks);
 
     return {
-      detected: blinkCount >= 2, // Giảm từ 3 → 2 lần
+      detected: blinkCount >= requiredBlinks,
       count: blinkCount,
       score,
-      reason: blinkCount < 2 ? 'Chưa đủ 2 lần chớp mắt' : 'OK'
+      reason: blinkCount < requiredBlinks ? `Chưa đủ ${requiredBlinks} lần chớp mắt` : 'OK'
     };
   }
 
@@ -844,13 +850,15 @@ class AdvancedAntiSpoofingService {
       if (this.eyeGlintHistory.length > 20) this.eyeGlintHistory.shift();
 
       const glintCount = this.eyeGlintHistory.filter(g => g.hasGlint).length;
-      const score = Math.min(1.0, glintCount / 3); // Giảm từ 5 → 3
+      const requiredGlints = this.isMobile ? 3 : 5;
+      const minGlints = this.isMobile ? 1 : 2;
+      const score = Math.min(1.0, glintCount / requiredGlints);
 
       return {
         score,
         hasGlint,
         brightness: avgGlint,
-        reason: glintCount < 1 ? 'Thiếu eye glint tự nhiên (video/ảnh)' : 'OK' // Giảm từ 2 → 1
+        reason: glintCount < minGlints ? 'Thiếu eye glint tự nhiên (video/ảnh)' : 'OK'
       };
     } catch (err) {
       return { score: 0.5, hasGlint: false };
@@ -1146,11 +1154,13 @@ class AdvancedAntiSpoofingService {
       colorTempResult.score * 0.10
     );
 
-    // Chỉ kiểm tra khi đã thu thập đủ dữ liệu (>= 20 frames)
-    const hasEnoughData = this.eyeGlintHistory.length >= 20; // Tăng từ 15 → 20
+    // Chỉ kiểm tra khi đã thu thập đủ dữ liệu
+    const requiredFrames = this.isMobile ? 20 : 15;
+    const hasEnoughData = this.eyeGlintHistory.length >= requiredFrames;
     
+    const minScore = this.isMobile ? 0.30 : 0.35;
     const passed = !hasEnoughData || (
-      totalScore > 0.30 && // Giảm từ 0.35 → 0.30
+      totalScore > minScore &&
       blinkResult.count >= 1 && 
       !lbpTopResult.isReplay
     );
