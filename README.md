@@ -51,16 +51,15 @@ MINI_CHECK_FACE_TIME/
 
 **Lần đầu:**
 ```bash
-npm run setup
+npm install
+cd server && npm install
+cd ../client && npm install
+cd ..
 ```
 
-**Chạy tất cả:**
+**Chạy ứng dụng (Khuyến nghị - Không cần Python):**
 ```bash
-# Chỉ cần Client + Server (Recommended)
 npm run dev:no-python
-
-# Hoặc full stack (Client + Server + Python)
-npm run dev
 ```
 
 ### 📦 Hoặc chạy từng server
@@ -77,7 +76,7 @@ npm run dev:server
 # → http://localhost:3000
 ```
 
-**Python (Optional):**
+**Python (Optional - Xem PYTHON_SERVER_OPTIONAL.md):**
 ```bash
 npm run dev:python
 # → http://localhost:5000

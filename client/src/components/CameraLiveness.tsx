@@ -24,21 +24,14 @@ export default function CameraLiveness() {
 
         intervalId = setInterval(async () => {
           if (!videoRef.current) return;
-          const canvas = document.createElement('canvas');
-          canvas.width = videoRef.current.videoWidth;
-          canvas.height = videoRef.current.videoHeight;
-          const ctx = canvas.getContext('2d');
-          if (ctx) {
-            ctx.drawImage(videoRef.current, 0, 0);
-            const result = await livenessService.checkLiveness(canvas, null, canvas.width);
-            setConfidence(result.confidence);
-            if (result.isReal) {
-              setLivenessStatus('✅ Người thật');
-              setIsReal(true);
-            } else {
-              setLivenessStatus('❌ Phát hiện giả mạo (ảnh/video)');
-              setIsReal(false);
-            }
+          const result = await livenessService.checkLiveness(videoRef.current);
+          setConfidence(result.confidence);
+          if (result.isReal) {
+            setLivenessStatus('✅ Người thật');
+            setIsReal(true);
+          } else {
+            setLivenessStatus('❌ Phát hiện giả mạo (ảnh/video)');
+            setIsReal(false);
           }
         }, 500);
       } catch (error) {

@@ -5,6 +5,7 @@ interface ControlButtonsProps {
   image1: Blob | null;
   image2: Blob | null;
   uploading: boolean;
+  modelsLoaded: boolean;
   onStartCamera: () => void;
   onStopCamera: () => void;
   onStartRecording: () => void;
@@ -20,6 +21,7 @@ export default function ControlButtons({
   image1,
   image2,
   uploading,
+  modelsLoaded,
   onStartCamera,
   onStopCamera,
   onStartRecording,
@@ -32,9 +34,10 @@ export default function ControlButtons({
       {!stream ? (
         <button
           onClick={onStartCamera}
-          className="col-span-1 sm:col-span-2 bg-green-600 text-white px-4 py-2.5 sm:py-3 rounded-lg hover:bg-green-700 active:scale-95 transition-transform text-sm sm:text-base font-medium cursor-pointer"
+          disabled={!modelsLoaded}
+          className="col-span-1 sm:col-span-2 bg-green-600 text-white px-4 py-2.5 sm:py-3 rounded-lg hover:bg-green-700 active:scale-95 transition-transform text-sm sm:text-base font-medium cursor-pointer disabled:bg-gray-400 disabled:cursor-not-allowed"
         >
-          Bật Camera
+          {modelsLoaded ? 'Bật Camera' : 'Đang tải AI Models...'}
         </button>
       ) : (
         <button

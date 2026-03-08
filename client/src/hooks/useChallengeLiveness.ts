@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, RefObject } from 'react';
-import challengeLivenessService from '../services/challengeLivenessService';
+import challengeLivenessService from '../services/challengeLivenessServiceFaceAPI';
 
 interface Challenge {
   type: string;
@@ -18,16 +18,27 @@ export const useChallengeLiveness = (
   const [progress, setProgress] = useState(0);
   const [completed, setCompleted] = useState(false);
   const [finalScore, setFinalScore] = useState(0);
+  const [faceLandmarks, setFaceLandmarks] = useState<any>(null);
 
   useEffect(() => {
     challengeLivenessService.loadModels();
   }, []);
 
   const startChallenge = useCallback(() => {
-    const newChallenge = challengeLivenessService.generateChallenge();
-    setChallenge(newChallenge);
-    setProgress(0);
-    setCompleted(false);
+    const totalChallenges = 5; // 5 thử thách
+    const currentCount = challengeLivenessService.challengeHistory.length;
+
+    if (currentCount < totalChallenges) {
+      const newChallenge = challengeLivenessService.generateChallenge();
+      setChallenge(newChallenge);
+      setProgress(0);
+      setCompleted(false);
+    } else {
+      // Hoàn thành tất cả
+      setCompleted(true);
+      const score = challengeLivenessService.getFinalScore();
+      setFinalScore(score);
+    }
   }, []);
 
   useEffect(() => {
@@ -36,22 +47,37 @@ export const useChallengeLiveness = (
     const interval = setInterval(async () => {
       if (!videoRef.current) return;
       const result = await challengeLivenessService.verifyChallenge(videoRef.current);
-      
+
       if (result) {
         setProgress(result.progress);
-        
-        if (result.completed) {
-          setCompleted(true);
+        if (result.landmarks) {
+          setFaceLandmarks(result.landmarks);
+        }
+
+        if (result.completed || result.timeout) {
+          const totalChallenges = 5;
+          const currentCount = challengeLivenessService.challengeHistory.length;
+
+          // Hiển thị thông báo 1.5s trước khi chuyển
           setTimeout(() => {
-            const score = challengeLivenessService.getFinalScore();
-            setFinalScore(score);
-          }, 500);
+            if (currentCount < totalChallenges) {
+              // Chuyển sang thử thách tiếp theo
+              setChallenge(null);
+              setTimeout(() => startChallenge(), 300);
+            } else {
+              // Hoàn thành tất cả
+              setChallenge(null);
+              setCompleted(true);
+              const score = challengeLivenessService.getFinalScore();
+              setFinalScore(score);
+            }
+          }, 1500);
         }
       }
     }, 100);
 
     return () => clearInterval(interval);
-  }, [enabled, challenge, videoRef]);
+  }, [enabled, challenge, videoRef, startChallenge]);
 
   const reset = useCallback(() => {
     challengeLivenessService.reset();
@@ -66,6 +92,7 @@ export const useChallengeLiveness = (
     progress,
     completed,
     finalScore,
+    faceLandmarks,
     startChallenge,
     reset,
   };

@@ -1,8 +1,11 @@
 import { lazy, Suspense } from 'react';
 
 const Camera = lazy(() => import('./Camera'));
+const FaceMeshTest = lazy(() => import('./FaceMeshTest'));
 
 function App() {
+  const isTest = window.location.search.includes('test');
+
   return (
     <Suspense
       fallback={
@@ -14,7 +17,7 @@ function App() {
         </div>
       }
     >
-      <Camera />
+      {isTest ? <FaceMeshTest /> : <Camera />}
     </Suspense>
   );
 }

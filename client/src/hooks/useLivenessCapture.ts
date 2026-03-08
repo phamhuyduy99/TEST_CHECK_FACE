@@ -69,27 +69,10 @@ export default function useLivenessCapture() {
   };
 
   const captureImage = (imageNumber: number) => {
-    if (!videoRef.current) return;
-
-    if (recording) {
-      setMessage('⚠️ Vui lòng dừng quay video trước khi chụp ảnh!');
-      return;
-    }
-
-    if (!videoBlob) {
-      setMessage('⚠️ Vui lòng quay video trước khi chụp ảnh!');
-      return;
-    }
-
-    if (imageNumber === 2 && !image1) {
-      setMessage('⚠️ Vui lòng chụp ảnh 1 trước!');
-      return;
-    }
+    if (!videoRef.current || !canvasRef.current) return;
 
     const canvas = canvasRef.current;
     const video = videoRef.current;
-
-    if (!canvas || !video) return;
 
     canvas.width = video.videoWidth;
     canvas.height = video.videoHeight;

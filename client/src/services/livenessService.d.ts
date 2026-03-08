@@ -1,26 +1,19 @@
-declare class LivenessService {
-  livenessSession: unknown;
-  isLoaded: boolean;
-  offscreenCanvas: HTMLCanvasElement | null;
-  lastResult: { isReal: boolean; confidence: number };
-  resultCache: Map<string, { result: { isReal: boolean; confidence: number }; timestamp: number }>;
-  faceMeshModel: unknown;
-  previousLandmarks: unknown;
-  blinkCount: number;
-  lastBlinkTime: number;
+export interface LivenessResult {
+  isReal: boolean;
+  confidence: number;
+}
 
+export interface FaceDetection {
+  keypoints?: Array<{ x: number; y: number; z?: number; name?: string }>;
+  box?: { xMin: number; yMin: number; xMax: number; yMax: number; width: number; height: number };
+}
+
+declare class LivenessService {
+  isLoaded: boolean;
+  faceMeshModel: any;
   loadModels(): Promise<void>;
-  resizeCanvas(sourceCanvas: HTMLCanvasElement, targetWidth?: number): HTMLCanvasElement;
-  scaleBbox(
-    bbox: { x: number; y: number; width: number; height: number },
-    originalWidth: number,
-    targetWidth: number
-  ): { x: number; y: number; width: number; height: number };
-  checkLiveness(
-    canvas: HTMLCanvasElement,
-    faceBbox: { x: number; y: number; width: number; height: number } | null,
-    originalWidth: number
-  ): Promise<{ isReal: boolean; confidence: number }>;
+  detectFace(video: HTMLVideoElement): Promise<FaceDetection | null>;
+  checkLiveness(video: HTMLVideoElement): Promise<LivenessResult>;
   clearCache(): void;
 }
 

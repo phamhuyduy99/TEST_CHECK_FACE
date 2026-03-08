@@ -38,7 +38,7 @@ export default defineConfig({
       output: {
         manualChunks: {
           'react-vendor': ['react', 'react-dom'],
-          'face-detection': ['face-api.js', '@mediapipe/face_detection', '@mediapipe/camera_utils'],
+          'face-api': ['face-api.js'],
         },
       },
     },

@@ -1,59 +1,35 @@
 import { useEffect, useState } from 'react';
-import * as faceapi from 'face-api.js';
+import challengeLivenessService from '../services/challengeLivenessServiceFaceAPI';
 
 export default function useFaceDetection() {
   const [modelsLoaded, setModelsLoaded] = useState(false);
 
   useEffect(() => {
-    const loadModels = async () => {
-      const MODEL_URL = '/models';
-      try {
-        await Promise.all([
-          faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL),
-          faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL),
-          faceapi.nets.faceRecognitionNet.loadFromUri(MODEL_URL),
-        ]);
-        setModelsLoaded(true);
-        console.log('✅ Face-api models loaded');
-      } catch (err) {
-        console.error('❌ Error loading face-api models:', err);
-      }
-    };
-
-    loadModels();
+    challengeLivenessService.loadModels().then(() => {
+      setModelsLoaded(true);
+    });
   }, []);
 
-  const detectFace = async (
-    imageElement: HTMLImageElement | HTMLVideoElement | HTMLCanvasElement
-  ) => {
-    if (!modelsLoaded) return null;
-
-    try {
-      const detection = await faceapi
-        .detectSingleFace(imageElement, new faceapi.TinyFaceDetectorOptions())
-        .withFaceLandmarks()
-        .withFaceDescriptor();
-
-      if (detection) {
-        return {
-          ...detection,
-          confidence: detection.detection.score,
-          landmarks: detection.landmarks.positions.length,
-          landmarkPositions: detection.landmarks.positions,
-        };
-      }
+  const detectFace = async (video: HTMLVideoElement) => {
+    if (!video || video.readyState !== 4 || video.videoWidth === 0) {
       return null;
+    }
+    try {
+      const detection = await (
+        await import('face-api.js')
+      ).detectSingleFace(
+        video,
+        new (await import('face-api.js')).TinyFaceDetectorOptions({
+          inputSize: 224,
+          scoreThreshold: 0.5,
+        })
+      );
+      return detection;
     } catch (err) {
-      console.error('Error detecting face:', err);
+      console.error('Face detection error:', err);
       return null;
     }
   };
 
-  const compareFaces = (descriptor1: Float32Array, descriptor2: Float32Array) => {
-    const distance = faceapi.euclideanDistance(descriptor1, descriptor2);
-    const similarity = 1 - distance;
-    return { distance, similarity, match: similarity > 0.6 };
-  };
-
-  return { modelsLoaded, detectFace, compareFaces };
+  return { modelsLoaded, detectFace };
 }

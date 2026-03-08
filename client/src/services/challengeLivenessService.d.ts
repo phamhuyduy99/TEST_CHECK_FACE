@@ -1,36 +1,31 @@
+export interface ChallengeResult {
+  progress: number;
+  completed: boolean;
+  timeout?: boolean;
+  score: number;
+  landmarks?: any;
+}
+
+export interface Challenge {
+  type: string;
+  instruction: string;
+  duration: number;
+  startTime: number;
+  completed: boolean;
+  score: number;
+}
+
 declare class ChallengeLivenessService {
-  faceMeshModel: unknown;
+  faceMeshModel: any;
   isLoaded: boolean;
-  currentChallenge: {
-    type: string;
-    instruction: string;
-    duration: number;
-    startTime: number;
-    completed: boolean;
-    score: number;
-  } | null;
-  challengeHistory: Array<{
-    type: string;
-    instruction: string;
-    duration: number;
-    startTime: number;
-    completed: boolean;
-    score: number;
-  }>;
-  baselineLandmarks: unknown;
+  currentChallenge: Challenge | null;
+  challengeHistory: Challenge[];
+  selectedChallenges: Challenge[];
 
   loadModels(): Promise<void>;
-  generateChallenge(): {
-    type: string;
-    instruction: string;
-    duration: number;
-    startTime: number;
-    completed: boolean;
-    score: number;
-  };
-  verifyChallenge(
-    videoElement: HTMLVideoElement
-  ): Promise<{ progress: number; completed: boolean; score?: number } | null>;
+  initializeChallenges(): void;
+  generateChallenge(): Challenge | null;
+  verifyChallenge(videoElement: HTMLVideoElement): Promise<ChallengeResult | null>;
   getFinalScore(): number;
   reset(): void;
 }

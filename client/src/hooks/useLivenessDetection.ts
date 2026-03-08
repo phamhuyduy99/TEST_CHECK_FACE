@@ -27,29 +27,9 @@ export const useLivenessDetection = (
     return canvas;
   });
 
-  const checkLiveness = useCallback(
-    async (video: HTMLVideoElement, faceDetection: FaceDetection) => {
-      const livenessCtx = livenessCanvas.getContext('2d', {
-        alpha: false,
-        willReadFrequently: true,
-      });
-
-      if (!livenessCtx) return null;
-
-      livenessCtx.drawImage(video, 0, 0, livenessCanvas.width, livenessCanvas.height);
-
-      const box = faceDetection.detection.box;
-      const faceBbox = {
-        x: box.x,
-        y: box.y,
-        width: box.width,
-        height: box.height,
-      };
-
-      return await livenessService.checkLiveness(livenessCanvas, faceBbox, video.videoWidth);
-    },
-    [livenessCanvas]
-  );
+  const checkLiveness = useCallback(async (video: HTMLVideoElement) => {
+    return await livenessService.checkLiveness(video);
+  }, []);
 
   useEffect(() => {
     let interval: ReturnType<typeof setInterval>;
@@ -86,16 +66,13 @@ export const useLivenessDetection = (
           // Check liveness
           if (frameCount % livenessFrameSkip === 0 && stableFrames >= 2) {
             try {
-              const livenessResult = await checkLiveness(video, faceApiDetection);
-
-              if (livenessResult) {
-                setIsRealPerson(livenessResult.isReal);
-                setLivenessStatus(
-                  livenessResult.isReal
-                    ? `✅ Người thật (${(livenessResult.confidence * 100).toFixed(0)}%)`
-                    : `❌ Giả mạo (${(livenessResult.confidence * 100).toFixed(0)}%)`
-                );
-              }
+              const livenessResult = await checkLiveness(video);
+              setIsRealPerson(livenessResult.isReal);
+              setLivenessStatus(
+                livenessResult.isReal
+                  ? `✅ Người thật (${(livenessResult.confidence * 100).toFixed(0)}%)`
+                  : `❌ Giả mạo (${(livenessResult.confidence * 100).toFixed(0)}%)`
+              );
             } catch (err) {
               console.error('Liveness check error:', err);
             }
