@@ -78,13 +78,13 @@ class AdvancedAntiSpoofingService {
 
     // Tính score dựa trên số lần chớp mắt
     const blinkCount = this.blinkHistory.length;
-    const score = Math.min(1.0, blinkCount / 3); // Cần ít nhất 3 lần chớp
+    const score = Math.min(1.0, blinkCount / 2); // Giảm từ 3 → 2 lần
 
     return {
-      detected: blinkCount >= 3,
+      detected: blinkCount >= 2, // Giảm từ 3 → 2 lần
       count: blinkCount,
       score,
-      reason: blinkCount < 3 ? 'Chưa đủ 3 lần chớp mắt' : 'OK'
+      reason: blinkCount < 2 ? 'Chưa đủ 2 lần chớp mắt' : 'OK'
     };
   }
 
@@ -844,13 +844,13 @@ class AdvancedAntiSpoofingService {
       if (this.eyeGlintHistory.length > 20) this.eyeGlintHistory.shift();
 
       const glintCount = this.eyeGlintHistory.filter(g => g.hasGlint).length;
-      const score = Math.min(1.0, glintCount / 5);
+      const score = Math.min(1.0, glintCount / 3); // Giảm từ 5 → 3
 
       return {
         score,
         hasGlint,
         brightness: avgGlint,
-        reason: glintCount < 2 ? 'Thiếu eye glint tự nhiên (video/ảnh)' : 'OK'
+        reason: glintCount < 1 ? 'Thiếu eye glint tự nhiên (video/ảnh)' : 'OK' // Giảm từ 2 → 1
       };
     } catch (err) {
       return { score: 0.5, hasGlint: false };
@@ -1146,11 +1146,11 @@ class AdvancedAntiSpoofingService {
       colorTempResult.score * 0.10
     );
 
-    // Chỉ kiểm tra khi đã thu thập đủ dữ liệu (>= 15 frames)
-    const hasEnoughData = this.eyeGlintHistory.length >= 15;
+    // Chỉ kiểm tra khi đã thu thập đủ dữ liệu (>= 20 frames)
+    const hasEnoughData = this.eyeGlintHistory.length >= 20; // Tăng từ 15 → 20
     
     const passed = !hasEnoughData || (
-      totalScore > 0.35 && 
+      totalScore > 0.30 && // Giảm từ 0.35 → 0.30
       blinkResult.count >= 1 && 
       !lbpTopResult.isReplay
     );
