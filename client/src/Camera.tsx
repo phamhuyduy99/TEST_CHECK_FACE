@@ -2,11 +2,13 @@ import useLivenessCapture from './hooks/useLivenessCapture';
 import useUpload from './hooks/useUpload';
 import useFaceDetection from './hooks/useFaceDetection';
 import livenessService from './services/livenessService';
+import { useChallengeLiveness } from './hooks/useChallengeLiveness';
 import LoadingOverlay from './components/LoadingOverlay';
 import ErrorAlert from './components/ErrorAlert';
 import SuccessResult from './components/SuccessResult';
 import ControlButtons from './components/ControlButtons';
 import LivenessGuide from './components/LivenessGuide';
+import ChallengeDisplay from './components/ChallengeDisplay';
 import FaceInfo from './components/FaceInfo';
 import { useState, useEffect } from 'react';
 
@@ -41,6 +43,7 @@ export default function Camera() {
   const [performanceMode, setPerformanceMode] = useState<'auto' | 'high' | 'low'>('auto');
   const [realPersonDetectedCount, setRealPersonDetectedCount] = useState<number>(0);
   const [autoCaptureDone, setAutoCaptureDone] = useState<boolean>(false);
+  const [challengeMode, setChallengeMode] = useState<boolean>(false);
   const {
     videoRef,
     canvasRef,
@@ -61,6 +64,8 @@ export default function Camera() {
 
   const { uploading, uploadProgress, uploadedUrls, error, setError, uploadData } = useUpload();
   const { modelsLoaded, detectFace } = useFaceDetection();
+  const { challenge, progress, completed, finalScore, startChallenge, reset: resetChallenge } =
+    useChallengeLiveness(videoRef, challengeMode && recording);
   // Skip MediaPipe - chỉ dùng Face-API.js (nhanh hơn)
   // const { mediaPipeLoaded, detectFaceMediaPipe } = useMediaPipeFaceDetection();
 
@@ -240,6 +245,7 @@ export default function Camera() {
     setFaceDetectedDuringRecording(false);
     setRealPersonDetectedCount(0);
     setAutoCaptureDone(false);
+    resetChallenge();
   };
 
   const handleStopRecording = () => {
@@ -277,7 +283,37 @@ export default function Camera() {
               <p className="font-bold text-yellow-800">Đang tải AI Models...</p>
             </div>
             <p className="text-sm text-yellow-700">• Face-API.js (Phát hiện khuôn mặt)</p>
-            <p className="text-sm text-yellow-700">• Faceplugin SDK (Kiểm tra liveness)</p>
+            <p className="text-sm text-yellow-700">• TensorFlow.js FaceMesh (Challenge Liveness)</p>
+          </div>
+        )}
+
+        <div className="mb-4 flex gap-2">
+          <button
+            onClick={() => setChallengeMode(!challengeMode)}
+            className={`flex-1 px-4 py-2 rounded-lg font-bold transition-all ${
+              challengeMode
+                ? 'bg-green-500 text-white'
+                : 'bg-gray-300 text-gray-700 hover:bg-gray-400'
+            }`}
+          >
+            {challengeMode ? '✅ Challenge Mode ON' : '⚪ Challenge Mode OFF'}
+          </button>
+          {challengeMode && recording && !challenge && (
+            <button
+              onClick={startChallenge}
+              className="px-6 py-2 bg-blue-500 text-white rounded-lg font-bold hover:bg-blue-600 animate-pulse"
+            >
+              🎯 Bắt đầu Challenge
+            </button>
+          )}
+        </div>
+
+        {finalScore > 0 && (
+          <div className="mb-4 p-4 bg-green-100 border-2 border-green-500 rounded-lg text-center">
+            <p className="text-2xl font-bold text-green-800">
+              🎉 Challenge Score: {(finalScore * 100).toFixed(0)}%
+            </p>
+            <p className="text-sm text-green-700">Xác nhận người thật!</p>
           </div>
         )}
 
@@ -338,6 +374,9 @@ export default function Camera() {
                 </div>
               )}
             </>
+          )}
+          {challengeMode && recording && (
+            <ChallengeDisplay challenge={challenge} progress={progress} completed={completed} />
           )}
           <LivenessGuide isRecording={recording} onComplete={handleStopRecording} />
           <canvas ref={canvasRef} className="hidden" />
