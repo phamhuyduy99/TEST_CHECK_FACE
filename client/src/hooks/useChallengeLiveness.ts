@@ -70,15 +70,20 @@ export const useChallengeLiveness = (
           const currentCount = challengeLivenessService.challengeHistory.length;
 
           setTimeout(() => {
-            setChallenge(null);
             if (currentCount < totalChallenges) {
-              setTimeout(() => startChallenge(), 1500);
+              setTimeout(() => {
+                setChallenge(null);
+                setTimeout(() => startChallenge(), 500);
+              }, 2000);
             } else {
-              setCompleted(true);
-              const score = challengeLivenessService.getFinalScore();
-              setFinalScore(score);
+              setTimeout(() => {
+                setChallenge(null);
+                setCompleted(true);
+                const score = challengeLivenessService.getFinalScore();
+                setFinalScore(score);
+              }, 2000);
             }
-          }, 1500);
+          }, 100);
         }
       }
     }, 100);
