@@ -256,15 +256,15 @@ class AntiSpoofingService {
     const passed = totalScore > 0.6 && failedChecks < 8;
 
     if (this.frameCount % 10 === 0) {
-      console.log('\n🛡️ BASIC ANTI-SPOOF [Frame ' + this.frameCount + ']:');
-      console.log('  Score:', totalScore.toFixed(3), '/ 1.0 (need > 0.6)');
-      console.log('  Failed:', failedChecks, '/ 20 (max 7)');
-      console.log('  Result:', passed ? '✅ PASS' : '❌ FAIL');
+      // console.log('\n🛡️ BASIC ANTI-SPOOF [Frame ' + this.frameCount + ']:');
+      // console.log('  Score:', totalScore.toFixed(3), '/ 1.0 (need > 0.6)');
+      // console.log('  Failed:', failedChecks, '/ 20 (max 7)');
+      // console.log('  Result:', passed ? '✅ PASS' : '❌ FAIL');
       
       const topFails = details.filter(d => !d.passed).slice(0, 5);
       if (topFails.length > 0) {
-        console.log('  Top fails:');
-        topFails.forEach(d => console.log('    ❌', d.name, '-', d.reason));
+        // console.log('  Top fails:');
+        // topFails.forEach(d => console.log('    ❌', d.name, '-', d.reason));
       }
     }
 

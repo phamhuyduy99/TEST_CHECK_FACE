@@ -120,11 +120,11 @@ export default function Camera() {
     const memory = (navigator as { deviceMemory?: number }).deviceMemory || 4;
 
     if (isMobile && (cores <= 4 || memory <= 4)) {
-      console.log('📱 Low-end device, performance mode');
+      // console.log('📱 Low-end device, performance mode');
     } else if (cores >= 8 && memory >= 8) {
-      console.log('🚀 High-end device, quality mode');
+      // console.log('🚀 High-end device, quality mode');
     } else {
-      console.log('⚖️ Mid-range device, balanced mode');
+      // console.log('⚖️ Mid-range device, balanced mode');
     }
   }, []);
 

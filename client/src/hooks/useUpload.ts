@@ -107,7 +107,7 @@ export default function useUpload() {
 
       // Retry logic
       if (attempt < 3) {
-        console.log(`🔄 Thử lại lần ${attempt + 1}/3...`);
+        // console.log(`🔄 Thử lại lần ${attempt + 1}/3...`);
         setMessage(`⚠️ Lỗi upload. Đang thử lại (${attempt + 1}/3)...`);
         await new Promise(resolve => setTimeout(resolve, 2000));
         return uploadData(videoBlob, image1, image2, setMessage, attempt + 1);

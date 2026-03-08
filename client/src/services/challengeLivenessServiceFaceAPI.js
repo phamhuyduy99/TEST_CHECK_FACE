@@ -15,12 +15,12 @@ class ChallengeLivenessService {
   async loadModels() {
     if (this.isLoaded) return;
     try {
-      console.log('🔄 Loading face-api.js models...');
+      // console.log('🔄 Loading face-api.js models...');
       const MODEL_URL = '/models';
       await faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL);
       await faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL);
       this.isLoaded = true;
-      console.log('✅ face-api.js loaded');
+      // console.log('✅ face-api.js loaded');
     } catch (err) {
       console.error('❌ face-api.js load failed:', err);
     }
@@ -46,7 +46,7 @@ class ChallengeLivenessService {
       randomDelay: Math.floor(Math.random() * 1000) + 500 // 500-1500ms
     }));
     
-    console.log('🎲 Random challenge sequence:', this.selectedChallenges.map(c => c.type));
+    // console.log('🎲 Random challenge sequence:', this.selectedChallenges.map(c => c.type));
   }
 
   generateChallenge() {
@@ -66,7 +66,7 @@ class ChallengeLivenessService {
       score: 0,
     };
     
-    console.log('🎯 Challenge #' + (index + 1) + ':', challenge.type, '| Instruction:', challenge.instruction);
+    // console.log('🎯 Challenge #' + (index + 1) + ':', challenge.type, '| Instruction:', challenge.instruction);
     
     return this.currentChallenge;
   }
@@ -114,27 +114,27 @@ class ChallengeLivenessService {
       this.frameCount++;
       
       if (this.frameCount > 20 && this.frameCount % 5 === 0) {
-        console.log('\n🔍 [FRAME', this.frameCount, '] Running anti-spoof checks...');
+        // console.log('\n🔍 [FRAME', this.frameCount, '] Running anti-spoof checks...');
         
         const antiSpoofResult = antiSpoofingService.performAntiSpoofingCheck(videoElement, detection);
         const advancedResult = advancedAntiSpoofing.performAdvancedCheck(landmarks, videoElement, detection.detection.box);
         
         this.antiSpoofingScore = (antiSpoofResult.score + advancedResult.score) / 2;
         
-        console.log('🛡️ Basic Anti-Spoof:', {
-          passed: antiSpoofResult.passed,
-          score: antiSpoofResult.score.toFixed(3),
-          failedChecks: antiSpoofResult.failedChecks + '/20'
-        });
+        // console.log('🛡️ Basic Anti-Spoof:', {
+        //   passed: antiSpoofResult.passed,
+        //   score: antiSpoofResult.score.toFixed(3),
+        //   failedChecks: antiSpoofResult.failedChecks + '/20'
+        // });
         
-        console.log('🔬 Advanced Anti-Spoof:', {
-          passed: advancedResult.passed,
-          score: advancedResult.score.toFixed(3),
-          blinks: advancedResult.details.blink.count,
-          lbpTopReplay: advancedResult.details.lbpTop.isReplay
-        });
+        // console.log('🔬 Advanced Anti-Spoof:', {
+        //   passed: advancedResult.passed,
+        //   score: advancedResult.score.toFixed(3),
+        //   blinks: advancedResult.details.blink.count,
+        //   lbpTopReplay: advancedResult.details.lbpTop.isReplay
+        // });
         
-        console.log('🎯 Combined Score:', this.antiSpoofingScore.toFixed(3));
+        // console.log('🎯 Combined Score:', this.antiSpoofingScore.toFixed(3));
         
         if (!antiSpoofResult.passed || !advancedResult.passed) {
           this.antiSpoofingFailed = true;

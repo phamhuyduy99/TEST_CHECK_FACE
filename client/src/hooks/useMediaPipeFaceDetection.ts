@@ -20,7 +20,7 @@ export default function useMediaPipeFaceDetection() {
         await faceDetection.initialize();
         faceDetectionRef.current = faceDetection;
         setMediaPipeLoaded(true);
-        console.log('✅ MediaPipe Face Detection loaded');
+        // console.log('✅ MediaPipe Face Detection loaded');
       } catch (err) {
         console.error('❌ Error loading MediaPipe:', err);
       }

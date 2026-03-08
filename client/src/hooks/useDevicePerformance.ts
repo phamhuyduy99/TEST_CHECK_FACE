@@ -10,12 +10,12 @@ export const useDevicePerformance = () => {
   let mode: PerformanceMode = 'auto';
   if (isMobile && (cores <= 4 || memory <= 4)) {
     mode = 'low';
-    console.log('📱 Low-end device, performance mode');
+    // console.log('📱 Low-end device, performance mode');
   } else if (cores >= 8 && memory >= 8) {
     mode = 'high';
-    console.log('🚀 High-end device, quality mode');
+    // console.log('🚀 High-end device, quality mode');
   } else {
-    console.log('⚖️ Mid-range device, balanced mode');
+    // console.log('⚖️ Mid-range device, balanced mode');
   }
 
   const [performanceMode] = useState<PerformanceMode>(mode);
