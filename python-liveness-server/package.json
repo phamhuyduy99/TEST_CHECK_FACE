@@ -1,0 +1,10 @@
+{
+  "name": "python-liveness-server",
+  "version": "1.0.0",
+  "description": "Python liveness detection server",
+  "scripts": {
+    "setup": "python -m venv venv && venv\\Scripts\\activate && pip install -r requirements.txt",
+    "dev": "venv\\Scripts\\python app.py",
+    "start": "venv\\Scripts\\python app.py"
+  }
+}

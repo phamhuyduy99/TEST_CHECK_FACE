@@ -47,39 +47,41 @@ MINI_CHECK_FACE_TIME/
 
 ## 🚀 Cài đặt và Chạy
 
-### 1. Cấu hình Cloudinary (BẮT BUỘC)
-Đọc file `CLOUDINARY_SETUP.md` để lấy API credentials và cấu hình file `server/.env`
+### ⚡ Cách nhanh nhất (1 lệnh)
 
-### 2. Cài đặt Dependencies
-
+**Lần đầu:**
 ```bash
-# Root
-npm install
-
-# Backend
-cd server
-npm install
-
-# Frontend
-cd client
-npm install
+npm run setup
 ```
 
-### 3. Chạy Ứng dụng
-
-**Terminal 1 - Backend (Auto-reload):**
+**Chạy tất cả:**
 ```bash
-cd server
+# Chỉ cần Client + Server (Recommended)
+npm run dev:no-python
+
+# Hoặc full stack (Client + Server + Python)
 npm run dev
 ```
-Server chạy tại: http://localhost:3000
 
-**Terminal 2 - Frontend (Hot Module Replacement):**
+### 📦 Hoặc chạy từng server
+
+**Client (React):**
 ```bash
-cd client
-npm run dev
+npm run dev:client
+# → http://localhost:5173
 ```
-Client chạy tại: http://localhost:5173
+
+**Server (Node.js):**
+```bash
+npm run dev:server
+# → http://localhost:3000
+```
+
+**Python (Optional):**
+```bash
+npm run dev:python
+# → http://localhost:5000
+```
 
 ## 🎯 Luồng Hoạt Động
 
