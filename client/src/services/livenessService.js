@@ -105,7 +105,7 @@ class LivenessService {
     return heuristicResult;
   }
 
-  // Detect motion between frames
+  // Detect motion between frames - Anti-static image
   detectMotion(landmarks) {
     if (!this.previousLandmarks) {
       this.previousLandmarks = landmarks;
@@ -126,6 +126,11 @@ class LivenessService {
     this.previousLandmarks = landmarks;
 
     const avgMovement = totalMovement / samplePoints.length;
+    
+    // Anti-static: Real person has 2-10px natural movement
+    if (avgMovement < 0.5) return 0.0; // Static image/print
+    if (avgMovement > 20) return 0.3; // Too much movement (suspicious)
+    
     return Math.min(1.0, avgMovement / 5);
   }
 
@@ -169,7 +174,7 @@ class LivenessService {
     return Math.min(1.0, depthRatio * 10);
   }
 
-  // Fallback: heuristic-based liveness detection
+  // Fallback: heuristic-based liveness detection with LBP-like texture analysis
   heuristicLiveness(canvas, faceBbox) {
     try {
       const ctx = canvas.getContext('2d');
@@ -180,24 +185,28 @@ class LivenessService {
       let variance = 0;
       const pixelCount = data.length / 4;
 
+      // Calculate brightness
       for (let i = 0; i < data.length; i += 4) {
         const gray = (data[i] + data[i + 1] + data[i + 2]) / 3;
         brightness += gray;
       }
       brightness /= pixelCount;
 
+      // Calculate variance (texture complexity)
       for (let i = 0; i < data.length; i += 4) {
         const gray = (data[i] + data[i + 1] + data[i + 2]) / 3;
         variance += Math.pow(gray - brightness, 2);
       }
       variance /= pixelCount;
 
-      const isReal = variance > 500 && brightness > 50 && brightness < 200;
+      // Real face: high variance (>1500), natural brightness (50-200)
+      // Print/screen: low variance (<800), uniform brightness
+      const isReal = variance > 1500 && brightness > 50 && brightness < 200;
       const confidence = Math.min(0.95, variance / 2000);
 
       return { isReal, confidence };
     } catch (err) {
-      return { isReal: true, confidence: 0.75 };
+      return { isReal: false, confidence: 0.0 };
     }
   }
 
