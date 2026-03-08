@@ -32,6 +32,7 @@ export default function Camera() {
   const [imagePreview2, setImagePreview2] = useState<string>('');
   const [videoPreview, setVideoPreview] = useState<string>('');
   const [faceDetectedDuringRecording, setFaceDetectedDuringRecording] = useState(false);
+  const [faceDetectionFrameCount, setFaceDetectionFrameCount] = useState(0);
   const [showButtons, setShowButtons] = useState(true);
   const [livenessStatus, setLivenessStatus] = useState<string>('');
   const [isRealPerson, setIsRealPerson] = useState<boolean | null>(null);
@@ -43,7 +44,7 @@ export default function Camera() {
   const [performanceMode, setPerformanceMode] = useState<'auto' | 'high' | 'low'>('auto');
   const [realPersonDetectedCount, setRealPersonDetectedCount] = useState<number>(0);
   const [autoCaptureDone, setAutoCaptureDone] = useState<boolean>(false);
-  const [challengeMode, setChallengeMode] = useState<boolean>(false);
+  const [challengePassed, setChallengePassed] = useState<boolean>(false);
   const {
     videoRef,
     canvasRef,
@@ -65,7 +66,20 @@ export default function Camera() {
   const { uploading, uploadProgress, uploadedUrls, error, setError, uploadData } = useUpload();
   const { modelsLoaded, detectFace } = useFaceDetection();
   const { challenge, progress, completed, finalScore, startChallenge, reset: resetChallenge } =
-    useChallengeLiveness(videoRef, challengeMode && recording);
+    useChallengeLiveness(videoRef, recording);
+
+  useEffect(() => {
+    if (recording && !challenge && !challengePassed) {
+      setTimeout(() => startChallenge(), 1000);
+    }
+  }, [recording, challenge, challengePassed, startChallenge]);
+
+  useEffect(() => {
+    if (completed && finalScore > 0.8) {
+      setChallengePassed(true);
+      setMessage('✅ Challenge hoàn thành! Bạn là người thật!');
+    }
+  }, [completed, finalScore, setMessage]);
   // Skip MediaPipe - chỉ dùng Face-API.js (nhanh hơn)
   // const { mediaPipeLoaded, detectFaceMediaPipe } = useMediaPipeFaceDetection();
 
@@ -96,6 +110,7 @@ export default function Camera() {
     let frameCount = 0;
     let lastFacePosition = { x: 0, y: 0 };
     let stableFrames = 0;
+    let faceFrameCount = 0;
 
     if (stream && modelsLoaded && videoRef.current && overlayCanvasRef) {
       const video = videoRef.current;
@@ -117,7 +132,11 @@ export default function Camera() {
         setLiveDetection(detected);
 
         if (detected) {
-          setFaceDetectedDuringRecording(true);
+          faceFrameCount++;
+          if (faceFrameCount >= 5) {
+            setFaceDetectedDuringRecording(true);
+          }
+          setFaceDetectionFrameCount(faceFrameCount);
 
           const box = faceApiDetection.detection.box;
           const centerX = box.x + box.width / 2;
@@ -136,6 +155,8 @@ export default function Camera() {
           lastFacePosition = { x: centerX, y: centerY };
         } else {
           stableFrames = 0;
+          faceFrameCount = Math.max(0, faceFrameCount - 1);
+          setFaceDetectionFrameCount(faceFrameCount);
         }
 
         if (detected && frameCount % livenessFrameSkip === 0 && stableFrames >= 2) {
@@ -243,22 +264,31 @@ export default function Camera() {
     setImagePreview2('');
     setVideoPreview('');
     setFaceDetectedDuringRecording(false);
+    setFaceDetectionFrameCount(0);
     setRealPersonDetectedCount(0);
     setAutoCaptureDone(false);
+    setChallengePassed(false);
     resetChallenge();
   };
 
   const handleStopRecording = () => {
-    if (!faceDetectedDuringRecording) {
+    if (!challengePassed) {
+      setMessage('❌ CHƯA HOÀN THÀNH CHALLENGE! Vui lòng làm theo hướng dẫn.');
+      return;
+    }
+
+    if (!faceDetectedDuringRecording || faceDetectionFrameCount < 5) {
       setMessage('❌ KHÔNG PHÁT HIỆN NGƯỜI TRONG VIDEO! Video không được lưu. Vui lòng quay lại.');
       stopRecording();
       setFaceDetectedDuringRecording(false);
+      setFaceDetectionFrameCount(0);
       setVideoPreview('');
       return;
     }
 
     stopRecording();
     setFaceDetectedDuringRecording(false);
+    setFaceDetectionFrameCount(0);
   };
 
   const handleUpload = () => {
@@ -287,33 +317,19 @@ export default function Camera() {
           </div>
         )}
 
-        <div className="mb-4 flex gap-2">
-          <button
-            onClick={() => setChallengeMode(!challengeMode)}
-            className={`flex-1 px-4 py-2 rounded-lg font-bold transition-all ${
-              challengeMode
-                ? 'bg-green-500 text-white'
-                : 'bg-gray-300 text-gray-700 hover:bg-gray-400'
-            }`}
-          >
-            {challengeMode ? '✅ Challenge Mode ON' : '⚪ Challenge Mode OFF'}
-          </button>
-          {challengeMode && recording && !challenge && (
-            <button
-              onClick={startChallenge}
-              className="px-6 py-2 bg-blue-500 text-white rounded-lg font-bold hover:bg-blue-600 animate-pulse"
-            >
-              🎯 Bắt đầu Challenge
-            </button>
-          )}
-        </div>
+        {recording && !challengePassed && (
+          <div className="mb-4 p-4 bg-red-100 border-2 border-red-500 rounded-lg text-center">
+            <p className="font-bold text-red-800 text-lg">⚠️ BẮT BUỘC: Hoàn thành Challenge!</p>
+            <p className="text-sm text-red-700">Làm theo hướng dẫn trên màn hình</p>
+          </div>
+        )}
 
-        {finalScore > 0 && (
+        {challengePassed && (
           <div className="mb-4 p-4 bg-green-100 border-2 border-green-500 rounded-lg text-center">
             <p className="text-2xl font-bold text-green-800">
               🎉 Challenge Score: {(finalScore * 100).toFixed(0)}%
             </p>
-            <p className="text-sm text-green-700">Xác nhận người thật!</p>
+            <p className="text-sm text-green-700">✅ Xác nhận người thật! Có thể dừng quay.</p>
           </div>
         )}
 
@@ -375,7 +391,7 @@ export default function Camera() {
               )}
             </>
           )}
-          {challengeMode && recording && (
+          {recording && (
             <ChallengeDisplay challenge={challenge} progress={progress} completed={completed} />
           )}
           <LivenessGuide isRecording={recording} onComplete={handleStopRecording} />
