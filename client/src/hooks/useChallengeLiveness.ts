@@ -19,13 +19,15 @@ export const useChallengeLiveness = (
   const [completed, setCompleted] = useState(false);
   const [finalScore, setFinalScore] = useState(0);
   const [faceLandmarks, setFaceLandmarks] = useState<any>(null);
+  const [spoofingDetected, setSpoofingDetected] = useState(false);
+  const [spoofingReason, setSpoofingReason] = useState('');
 
   useEffect(() => {
     challengeLivenessService.loadModels();
   }, []);
 
   const startChallenge = useCallback(() => {
-    const totalChallenges = 5; // 5 thử thách
+    const totalChallenges = 5;
     const currentCount = challengeLivenessService.challengeHistory.length;
 
     if (currentCount < totalChallenges) {
@@ -34,7 +36,6 @@ export const useChallengeLiveness = (
       setProgress(0);
       setCompleted(false);
     } else {
-      // Hoàn thành tất cả
       setCompleted(true);
       const score = challengeLivenessService.getFinalScore();
       setFinalScore(score);
@@ -54,19 +55,25 @@ export const useChallengeLiveness = (
           setFaceLandmarks(result.landmarks);
         }
 
+        // PHÁT HIỆN GIAN LẬN
+        if (result.spoofingDetected) {
+          setSpoofingDetected(true);
+          setSpoofingReason(result.spoofingReason || 'Phát hiện gian lận');
+          setChallenge(null);
+          setCompleted(true);
+          setFinalScore(0);
+          return;
+        }
+
         if (result.completed || result.timeout) {
           const totalChallenges = 5;
           const currentCount = challengeLivenessService.challengeHistory.length;
 
-          // Hiển thị thông báo 1.5s trước khi chuyển
           setTimeout(() => {
+            setChallenge(null);
             if (currentCount < totalChallenges) {
-              // Chuyển sang thử thách tiếp theo
-              setChallenge(null);
               setTimeout(() => startChallenge(), 300);
             } else {
-              // Hoàn thành tất cả
-              setChallenge(null);
               setCompleted(true);
               const score = challengeLivenessService.getFinalScore();
               setFinalScore(score);
@@ -85,6 +92,8 @@ export const useChallengeLiveness = (
     setProgress(0);
     setCompleted(false);
     setFinalScore(0);
+    setSpoofingDetected(false);
+    setSpoofingReason('');
   }, []);
 
   return {
@@ -93,6 +102,8 @@ export const useChallengeLiveness = (
     completed,
     finalScore,
     faceLandmarks,
+    spoofingDetected,
+    spoofingReason,
     startChallenge,
     reset,
   };

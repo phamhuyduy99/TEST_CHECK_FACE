@@ -145,6 +145,7 @@ export default function useUpload() {
     error,
     retryCount,
     setError,
+    setUploadedUrls, // Export để reset
     uploadData,
   };
 }

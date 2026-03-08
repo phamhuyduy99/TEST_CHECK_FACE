@@ -7,9 +7,9 @@ import LoadingOverlay from './components/LoadingOverlay';
 import ErrorAlert from './components/ErrorAlert';
 import SuccessResult from './components/SuccessResult';
 import ControlButtons from './components/ControlButtons';
-import ChallengeDisplay from './components/ChallengeDisplay';
 import FaceLandmarksOverlay from './components/FaceLandmarksOverlay';
 import FaceInfo from './components/FaceInfo';
+import SpoofingAlert from './components/SpoofingAlert';
 import { useState, useEffect } from 'react';
 
 interface FaceDetectionInfo {
@@ -26,7 +26,6 @@ export default function Camera() {
   const [faceMatchResult, setFaceMatchResult] = useState<string>('');
   const [faceInfo1, setFaceInfo1] = useState<FaceDetectionInfo | null>(null);
   const [faceInfo2, setFaceInfo2] = useState<FaceDetectionInfo | null>(null);
-  const [liveDetection, setLiveDetection] = useState<boolean>(false);
   const [overlayCanvasRef] = useState<HTMLCanvasElement | null>(null);
   const [videoPreview, setVideoPreview] = useState<string>('');
   const [showButtons, setShowButtons] = useState(true);
@@ -50,7 +49,7 @@ export default function Camera() {
     resetRecording,
   } = useLivenessCapture();
 
-  const { uploading, uploadProgress, uploadedUrls, error, setError, uploadData } = useUpload();
+  const { uploading, uploadProgress, uploadedUrls, error, setError, setUploadedUrls, uploadData } = useUpload();
   const { modelsLoaded, detectFace } = useFaceDetection();
   const {
     challenge,
@@ -58,21 +57,27 @@ export default function Camera() {
     completed,
     finalScore,
     faceLandmarks,
+    spoofingDetected,
+    spoofingReason,
     startChallenge,
     reset: resetChallenge,
   } = useChallengeLiveness(videoRef, recording);
 
   useEffect(() => {
-    if (recording && !challenge && !challengePassed) {
-      setTimeout(() => startChallenge(), 1000);
+    if (recording && !challenge && !challengePassed && !spoofingDetected && !completed) {
+      const timer = setTimeout(() => startChallenge(), 1000);
+      return () => clearTimeout(timer);
     }
-  }, [recording, challenge, challengePassed, startChallenge]);
+  }, [recording, challenge, challengePassed, spoofingDetected, completed, startChallenge]);
 
   useEffect(() => {
-    if (completed && finalScore > 0.8) {
-      const passedCount = challengeLivenessService.challengeHistory.filter(
-        (c: any) => c.score > 0
-      ).length;
+    if (!completed) return;
+
+    const passedCount = challengeLivenessService.challengeHistory.filter(
+      (c: any) => c.score > 0
+    ).length;
+
+    if (finalScore >= 0.8 && passedCount === 5) {
       setChallengePassed(true);
       setMessage(`✅ Challenge hoàn thành! Pass: ${passedCount}/5 - Bạn là người thật!`);
 
@@ -85,10 +90,7 @@ export default function Camera() {
           }, 500);
         }
       }, 1000);
-    } else if (completed && finalScore <= 0.8) {
-      const passedCount = challengeLivenessService.challengeHistory.filter(
-        (c: any) => c.score > 0
-      ).length;
+    } else {
       const antiSpoofFailed = (challengeLivenessService as any).antiSpoofingFailed;
 
       if (antiSpoofFailed) {
@@ -133,9 +135,7 @@ export default function Camera() {
       const video = videoRef.current;
 
       interval = setInterval(async () => {
-        const faceDetection = await detectFace(video);
-        const detected = !!faceDetection;
-        setLiveDetection(detected);
+        await detectFace(video);
       }, 1000);
     }
 
@@ -158,11 +158,12 @@ export default function Camera() {
     setFaceMatchResult('');
     setFaceInfo1(null);
     setFaceInfo2(null);
-    setLiveDetection(false);
     setVideoPreview('');
     setChallengePassed(false);
     setAntiSpoofWarning('');
     resetChallenge();
+    setError(null);
+    setUploadedUrls(null); // Ẩn kết quả upload
   };
 
   const handleStopRecording = () => {
@@ -182,6 +183,16 @@ export default function Camera() {
 
   return (
     <div className="min-h-screen bg-gray-100 p-2 sm:p-4 pb-32">
+      {spoofingDetected && (
+        <SpoofingAlert 
+          reason={spoofingReason} 
+          onRetry={() => {
+            handleReset();
+            startCamera();
+          }} 
+        />
+      )}
+      
       {uploading && <LoadingOverlay progress={uploadProgress} />}
 
       <div className="max-w-2xl mx-auto bg-white rounded-lg shadow-lg p-4 sm:p-6">
@@ -243,11 +254,13 @@ export default function Camera() {
                 >
                   <span className="text-sm text-gray-700">
                     {idx + 1}. {ch.instruction}
+                    {ch.timeout && <span className="text-xs text-orange-600 ml-2">(Timeout)</span>}
+                    {ch.replayDetected && <span className="text-xs text-red-600 ml-2">({ch.replayReason || 'Replay'})</span>}
                   </span>
                   <span
-                    className={`text-sm font-bold ${ch.score > 0 ? 'text-green-600' : 'text-red-600'}`}
+                    className={`text-sm font-bold ${ch.score >= 1.0 ? 'text-green-600' : 'text-red-600'}`}
                   >
-                    {ch.score > 0 ? '✅ Pass' : '❌ Fail'}
+                    {ch.score >= 1.0 ? '✅ Pass' : `❌ Fail (${ch.score.toFixed(1)})`}
                   </span>
                 </div>
               ))}
@@ -274,11 +287,13 @@ export default function Camera() {
                 >
                   <span className="text-sm text-gray-700">
                     {idx + 1}. {ch.instruction}
+                    {ch.timeout && <span className="text-xs text-orange-600 ml-2">(Timeout)</span>}
+                    {ch.replayDetected && <span className="text-xs text-red-600 ml-2">({ch.replayReason || 'Replay'})</span>}
                   </span>
                   <span
-                    className={`text-sm font-bold ${ch.score > 0 ? 'text-green-600' : 'text-red-600'}`}
+                    className={`text-sm font-bold ${ch.score >= 1.0 ? 'text-green-600' : 'text-red-600'}`}
                   >
-                    {ch.score > 0 ? '✅ Pass' : '❌ Fail'}
+                    {ch.score >= 1.0 ? '✅ Pass' : `❌ Fail (${ch.score.toFixed(1)})`}
                   </span>
                 </div>
               ))}
@@ -294,6 +309,52 @@ export default function Camera() {
             muted
             className="w-full rounded-lg bg-black aspect-video"
           />
+          {recording && challenge && (() => {
+            const currentChallengeIndex = challengeLivenessService.challengeHistory.length;
+            const lastChallenge = challengeLivenessService.challengeHistory[currentChallengeIndex - 1];
+            const isLastChallengePass = lastChallenge && lastChallenge.score >= 1.0;
+            const showAsCompleted = progress >= 100 && lastChallenge && lastChallenge.type === challenge.type;
+            
+            return (
+              <div className="absolute top-4 left-4 right-4 z-[100] pointer-events-none">
+                <div
+                  className={`p-4 rounded-lg shadow-2xl transition-all ${
+                    showAsCompleted && isLastChallengePass
+                      ? 'bg-green-500 text-white scale-105'
+                      : showAsCompleted && !isLastChallengePass
+                      ? 'bg-red-500 text-white scale-105'
+                      : 'bg-blue-500 text-white animate-pulse'
+                  }`}
+                >
+                  <div className="flex justify-between items-center mb-2">
+                    <div className="text-2xl font-bold">{challenge.instruction}</div>
+                    <div className="text-sm bg-white/20 px-3 py-1 rounded-full">
+                      {challengeLivenessService.challengeHistory.length}/5
+                    </div>
+                  </div>
+
+                  <div className="w-full bg-white/30 rounded-full h-3 overflow-hidden">
+                    <div
+                      className={`h-full transition-all duration-300 rounded-full ${
+                        showAsCompleted && isLastChallengePass
+                          ? 'bg-green-200'
+                          : showAsCompleted && !isLastChallengePass
+                          ? 'bg-red-200'
+                          : 'bg-white'
+                      }`}
+                      style={{ width: `${progress}%` }}
+                    />
+                  </div>
+
+                  {showAsCompleted && (
+                    <div className="mt-2 text-xl font-bold animate-bounce">
+                      {isLastChallengePass ? '✅ Hoàn thành! 🎉' : '❌ Thất bại!'}
+                    </div>
+                  )}
+                </div>
+              </div>
+            );
+          })()}
           {recording &&
             overlayCanvasRef &&
             overlayCanvasRef.width > 0 &&
@@ -321,15 +382,6 @@ export default function Camera() {
           {recording && (
             <>
               <FaceLandmarksOverlay videoRef={videoRef} landmarks={faceLandmarks} show={true} />
-              <div
-                className={`absolute top-4 right-4 px-4 py-3 rounded-full font-bold shadow-xl transition-all ${
-                  liveDetection
-                    ? 'bg-green-500 text-white text-base sm:text-lg'
-                    : 'bg-red-600 text-white text-lg sm:text-xl animate-bounce'
-                }`}
-              >
-                {liveDetection ? '✅ Phát hiện người' : '⚠️ Không thấy người'}
-              </div>
               {challenge && (
                 <div className="absolute bottom-4 left-4 right-4 bg-black/70 text-white p-3 rounded-lg">
                   <div className="text-sm mb-1">
@@ -346,15 +398,6 @@ export default function Camera() {
                 </div>
               )}
             </>
-          )}
-          {recording && (
-            <ChallengeDisplay
-              challenge={challenge}
-              progress={progress}
-              completed={completed}
-              challengeCount={challengeLivenessService.challengeHistory.length}
-              totalChallenges={5}
-            />
           )}
           <canvas ref={canvasRef} className="hidden" />
         </div>

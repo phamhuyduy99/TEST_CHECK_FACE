@@ -10,7 +10,8 @@ Phát hiện giả mạo trong background mà không cần tương tác:
 - ✅ Brightness Variation Check
 - ✅ Frame Rate Consistency Check
 - ✅ Texture Analysis (Edge Density)
-- ✅ Session Duration Check
+- ✅ Moiré Pattern Detection (vân sóng màn hình)
+- ✅ Screen Reflection Detection (phản chiếu màn hình)
 
 ### 2. **Active Liveness** (Challenge-Response)
 Yêu cầu người dùng thực hiện hành động ngẫu nhiên:
@@ -28,7 +29,7 @@ Yêu cầu người dùng thực hiện hành động ngẫu nhiên:
 |-------------|--------------|-------------|----------|----------------------|
 | **Ảnh in** | 95% | 99% | **99.5%** | Texture + Brightness + Challenges |
 | **Video replay đơn giản** | 90% | 98% | **99%** | Frame Rate + Face Size + Challenges |
-| **Màn hình điện thoại** | 92% | 99% | **99%** | Brightness + Texture + Challenges |
+| **Màn hình điện thoại** | 92% | 99% | **99.5%** | Moiré + Reflection + Brightness + Challenges |
 | **Video chất lượng cao** | 75% | 95% | **98%** | Frame Rate + Session + Challenges |
 | **Video loop ngắn** | 85% | 98% | **99%** | Session Duration + Challenges |
 | **Deepfake cơ bản** | 60% | 90% | **95%** | All methods combined |
@@ -42,12 +43,13 @@ Yêu cầu người dùng thực hiện hành động ngẫu nhiên:
 
 #### `antiSpoofingService.js`
 ```javascript
-// 5 phương pháp phát hiện giả mạo
+// 6 phương pháp phát hiện giả mạo
 - checkFaceSizeConsistency()      // Phát hiện video/ảnh di chuyển
 - checkBrightnessVariation()      // Phát hiện màn hình
 - checkFrameRateConsistency()     // Phát hiện video replay
 - checkTextureQuality()           // Phát hiện ảnh in/màn hình
-- checkSessionDuration()          // Phát hiện video loop ngắn
+- checkMoirePattern()             // Phát hiện vân sóng màn hình
+- checkScreenReflection()         // Phát hiện phản chiếu màn hình
 ```
 
 **Tích hợp**: Đã tích hợp vào `challengeLivenessServiceFaceAPI.js`
@@ -407,7 +409,8 @@ analytics.track('anti_spoofing_check', {
 - [x] Documentation
 
 ### Roadmap 🔄
-- [ ] Moiré Pattern Detection (màn hình LCD)
+- [x] Moiré Pattern Detection (màn hình LCD)
+- [x] Screen Reflection Detection (phản chiếu màn hình)
 - [ ] LBP-TOP Texture Analysis (advanced)
 - [ ] Blink Pattern Analysis (phát hiện video loop)
 - [ ] Micro-Movement Detection (tim đập, thở)

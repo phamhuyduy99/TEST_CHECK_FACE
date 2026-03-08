@@ -1,5 +1,6 @@
 import * as faceapi from 'face-api.js';
 import antiSpoofingService from './antiSpoofingService';
+import advancedAntiSpoofing from './advancedAntiSpoofing';
 
 class ChallengeLivenessService {
   constructor() {
@@ -27,16 +28,25 @@ class ChallengeLivenessService {
 
   initializeChallenges() {
     const allChallenges = [
-      { type: 'EYEBROW_RAISE', instruction: '🤨 Nhấc lông mày 4 lần', duration: 5000 },
-      { type: 'SMILE', instruction: '😊 Cười', duration: 2000 },
-      { type: 'TURN_LEFT', instruction: '⬅️ Quay đầu sang PHẢI (trên màn hình là trái)', duration: 2000 },
-      { type: 'TURN_RIGHT', instruction: '➡️ Quay đầu sang TRÁI (trên màn hình là phải)', duration: 2000 },
-      { type: 'NOD', instruction: '⬇️ Gật đầu', duration: 2000 },
-      { type: 'OPEN_MOUTH', instruction: '😮 Há miệng', duration: 2000 },
+      { type: 'EYEBROW_RAISE', instruction: '🤨 Nhấc lông mày 4 lần', duration: 6000, minResponseTime: 500, maxResponseTime: 6000 },
+      { type: 'SMILE', instruction: '😊 Cười', duration: 2500, minResponseTime: 200, maxResponseTime: 2500 },
+      { type: 'TURN_LEFT', instruction: '⬅️ Quay đầu sang PHẢI (trên màn hình là trái)', duration: 2500, minResponseTime: 200, maxResponseTime: 2500 },
+      { type: 'TURN_RIGHT', instruction: '➡️ Quay đầu sang TRÁI (trên màn hình là phải)', duration: 2500, minResponseTime: 200, maxResponseTime: 2500 },
+      { type: 'NOD', instruction: '⬇️ Gật đầu', duration: 2500, minResponseTime: 200, maxResponseTime: 2500 },
+      { type: 'OPEN_MOUTH', instruction: '😮 Há miệng', duration: 2000, minResponseTime: 200, maxResponseTime: 2000 },
     ];
     
+    // Shuffle ngẫu nhiên thứ tự challenges
     const shuffled = allChallenges.sort(() => Math.random() - 0.5);
     this.selectedChallenges = shuffled.slice(0, 5);
+    
+    // Thêm random timing cho mỗi challenge (500-1500ms)
+    this.selectedChallenges = this.selectedChallenges.map(c => ({
+      ...c,
+      randomDelay: Math.floor(Math.random() * 1000) + 500 // 500-1500ms
+    }));
+    
+    console.log('🎲 Random challenge sequence:', this.selectedChallenges.map(c => c.type));
   }
 
   generateChallenge() {
@@ -51,18 +61,26 @@ class ChallengeLivenessService {
     this.currentChallenge = {
       ...challenge,
       startTime: Date.now(),
+      firstActionTime: null,
       completed: false,
       score: 0,
     };
+    
+    console.log('🎯 Challenge #' + (index + 1) + ':', challenge.type, '| Instruction:', challenge.instruction);
     
     return this.currentChallenge;
   }
 
   async verifyChallenge(videoElement) {
-    if (!this.currentChallenge) return null;
+    if (!this.currentChallenge) {
+      // console.log('⚠️ No current challenge');
+      return null;
+    }
+
+    // console.log('🔍 Verifying challenge:', this.currentChallenge.type);
 
     const elapsed = Date.now() - this.currentChallenge.startTime;
-    const timeout = elapsed >= 10000;
+    const timeout = elapsed >= 8000; // 8s để đủ thời gian cho EYEBROW_RAISE (6s)
     
     if (!this.isLoaded) {
       return { progress: 0, completed: false, timeout: false, score: 0 };
@@ -88,30 +106,70 @@ class ChallengeLivenessService {
         return { progress: 0, completed: false, timeout: false, score: 0 };
       }
 
-      // ANTI-SPOOFING CHECK
-      const antiSpoofResult = antiSpoofingService.performAntiSpoofingCheck(videoElement, detection);
-      this.antiSpoofingScore = antiSpoofResult.score;
-      
-      if (!antiSpoofResult.passed) {
-        this.antiSpoofingFailed = true;
-        this.antiSpoofingDetails = antiSpoofResult.details;
-        console.error('🚨 ANTI-SPOOFING FAILED:', antiSpoofResult);
-        this.currentChallenge.completed = true;
-        this.currentChallenge.score = 0.0;
-        this.challengeHistory.push({ ...this.currentChallenge, antiSpoofFailed: true });
-        this.currentChallenge = null;
-        return { 
-          progress: 100, 
-          completed: true, 
-          timeout: false, 
-          score: 0, 
-          antiSpoofFailed: true,
-          antiSpoofReason: antiSpoofResult.details.filter(d => !d.passed).map(d => d.reason).join(', '),
-          antiSpoofDetails: antiSpoofResult.details
-        };
-      }
-
       const landmarks = detection.landmarks.positions;
+      
+      // ANTI-SPOOFING: Phát hiện gian lận → THOÁT NGUỒN
+      // Chỉ check sau 5s (150 frames) để camera ổn định và user có thời gian
+      if (this.frameCount === undefined) this.frameCount = 0;
+      this.frameCount++;
+      
+      if (this.frameCount > 20 && this.frameCount % 5 === 0) {
+        console.log('\n🔍 [FRAME', this.frameCount, '] Running anti-spoof checks...');
+        
+        const antiSpoofResult = antiSpoofingService.performAntiSpoofingCheck(videoElement, detection);
+        const advancedResult = advancedAntiSpoofing.performAdvancedCheck(landmarks, videoElement, detection.detection.box);
+        
+        this.antiSpoofingScore = (antiSpoofResult.score + advancedResult.score) / 2;
+        
+        console.log('🛡️ Basic Anti-Spoof:', {
+          passed: antiSpoofResult.passed,
+          score: antiSpoofResult.score.toFixed(3),
+          failedChecks: antiSpoofResult.failedChecks + '/20'
+        });
+        
+        console.log('🔬 Advanced Anti-Spoof:', {
+          passed: advancedResult.passed,
+          score: advancedResult.score.toFixed(3),
+          blinks: advancedResult.details.blink.count,
+          lbpTopReplay: advancedResult.details.lbpTop.isReplay
+        });
+        
+        console.log('🎯 Combined Score:', this.antiSpoofingScore.toFixed(3));
+        
+        if (!antiSpoofResult.passed || !advancedResult.passed) {
+          this.antiSpoofingFailed = true;
+          const failReason = [
+            ...antiSpoofResult.details.filter(d => !d.passed).map(d => d.reason),
+            ...Object.entries(advancedResult.details)
+              .filter(([k, v]) => v.score < 0.5)
+              .map(([k, v]) => v.reason || k)
+          ].join(', ');
+          
+          console.error('\n🚨🚨🚨 SPOOFING DETECTED! 🚨🚨🚨');
+          console.error('Reason:', failReason);
+          console.error('Basic passed:', antiSpoofResult.passed);
+          console.error('Advanced passed:', advancedResult.passed);
+          
+          if (this.currentChallenge) {
+            this.currentChallenge.completed = true;
+            this.currentChallenge.score = 0.0;
+            this.currentChallenge.antiSpoofFailed = true;
+            this.challengeHistory.push({ ...this.currentChallenge });
+            this.currentChallenge = null;
+          }
+          
+          return { 
+            progress: 100, 
+            completed: true, 
+            timeout: false, 
+            score: 0, 
+            spoofingDetected: true,
+            spoofingReason: failReason,
+            antiSpoofDetails: antiSpoofResult.details,
+            advancedDetails: advancedResult.details
+          };
+        }
+      }
       
       let result = null;
       switch (this.currentChallenge.type) {
@@ -138,15 +196,45 @@ class ChallengeLivenessService {
       }
 
       if (result.completed && !this.currentChallenge.completed) {
+        // Kiểm tra response time (dùng firstActionTime nếu có, không thì dùng startTime)
+        const actionTime = this.currentChallenge.firstActionTime || this.currentChallenge.startTime;
+        const responseTime = Date.now() - actionTime;
+        
+        const minTime = this.currentChallenge.minResponseTime || 500;
+        const maxTime = this.currentChallenge.maxResponseTime || 5000;
+        
+        // console.log('⏱️ Response time:', responseTime + 'ms', '(valid:', minTime + '-' + maxTime + 'ms)');
+        
+        // TẮT CHECK REPLAY - Chỉ check timeout
+        // if (responseTime < minTime) {
+        //   console.log('⚠️ VIDEO REPLAY DETECTED: Response quá nhanh! (' + responseTime + 'ms < ' + minTime + 'ms)');
+        //   this.currentChallenge.completed = true;
+        //   this.currentChallenge.score = 0.0;
+        //   this.currentChallenge.replayDetected = true;
+        //   this.currentChallenge.replayReason = `Hành động quá nhanh (${responseTime}ms)`;
+        //   this.challengeHistory.push({ ...this.currentChallenge });
+        //   this.currentChallenge = null;
+        //   this.resetStates();
+        //   return { progress: 100, completed: true, timeout: false, score: 0, replayDetected: true, replayReason: `Hành động quá nhanh (${responseTime}ms)` };
+        // }
+        
+        if (responseTime > maxTime) {
+          // console.log('⚠️ TIMEOUT: Response quá chậm!');
+          this.currentChallenge.completed = true;
+          this.currentChallenge.score = 0.0;
+          this.challengeHistory.push({ ...this.currentChallenge });
+          this.currentChallenge = null;
+          this.resetStates();
+          return { progress: 100, completed: true, timeout: true, score: 0 };
+        }
+        
+        // Pass
         this.currentChallenge.completed = true;
         this.currentChallenge.score = 1.0;
+        this.currentChallenge.responseTime = responseTime;
         this.challengeHistory.push({ ...this.currentChallenge });
         this.currentChallenge = null;
-        this.eyebrowState = null;
-        this.nodState = null;
-        this.smileState = null;
-        this.turnLeftState = null;
-        this.turnRightState = null;
+        this.resetStates();
         return { progress: 100, completed: true, timeout: false, score: 1.0, landmarks: detection };
       }
 
@@ -155,11 +243,7 @@ class ChallengeLivenessService {
         this.currentChallenge.score = 0.0;
         this.challengeHistory.push({ ...this.currentChallenge });
         this.currentChallenge = null;
-        this.eyebrowState = null;
-        this.nodState = null;
-        this.smileState = null;
-        this.turnLeftState = null;
-        this.turnRightState = null;
+        this.resetStates();
         return { progress: 100, completed: true, timeout: true, score: 0 };
       }
 
@@ -201,18 +285,17 @@ class ChallengeLivenessService {
     this.eyebrowState.maxDistance = Math.max(this.eyebrowState.maxDistance, browToEyeDistance);
     const now = Date.now();
     
-    // const ratio = browToEyeDistance / this.eyebrowState.baselineDistance;
-    // console.log('🤨 Eyebrow - Distance:', browToEyeDistance.toFixed(1), 'Ratio:', ratio.toFixed(2), 'Count:', this.eyebrowState.count, 'Need: 4x');
-    
     if (browToEyeDistance > this.eyebrowState.baselineDistance * 1.15 && !this.eyebrowState.wasRaised && now - this.eyebrowState.lastRaise > 300) {
       this.eyebrowState.wasRaised = true;
-      // console.log('✅ Eyebrow RAISED! Distance:', browToEyeDistance.toFixed(1));
+      // Track first action time ONCE
+      if (!this.currentChallenge.firstActionTime) {
+        this.currentChallenge.firstActionTime = now;
+      }
     }
     else if (browToEyeDistance < this.eyebrowState.baselineDistance * 1.05 && this.eyebrowState.wasRaised) {
       this.eyebrowState.count++;
       this.eyebrowState.lastRaise = now;
       this.eyebrowState.wasRaised = false;
-      // console.log('✅✅✅ EYEBROW RAISE #' + this.eyebrowState.count + ' ✅✅✅');
     }
 
     const progress = Math.min(100, (this.eyebrowState.count / 4) * 100);
@@ -243,7 +326,6 @@ class ChallengeLivenessService {
         maxWidth: mouthWidth,
         maxCornerLift: cornerLift
       };
-      // console.log('😊 Smile init - Width:', mouthWidth.toFixed(1), 'Lift:', cornerLift.toFixed(1));
       return { progress: 0, completed: false, score: 0 };
     }
 
@@ -253,14 +335,14 @@ class ChallengeLivenessService {
     const widthIncrease = mouthWidth - this.smileState.baselineWidth;
     const liftIncrease = cornerLift - this.smileState.baselineCornerLift;
 
-    // console.log('😊 Smile - Width:', widthIncrease.toFixed(1), 'Lift:', liftIncrease.toFixed(1), 'Need: W>10, L>5');
-
     const progress = Math.max(0, Math.min(100, ((widthIncrease / 15) + (liftIncrease / 10)) * 50));
-    const completed = widthIncrease > 10 && liftIncrease > 5;
-
-    if (completed) {
-      // console.log('✅✅✅ SMILE PASS! Width +', widthIncrease.toFixed(1), 'Lift +', liftIncrease.toFixed(1));
+    // Track first action time khi bắt đầu cười
+    if ((widthIncrease > 5 || liftIncrease > 3) && !this.currentChallenge.firstActionTime) {
+      this.currentChallenge.firstActionTime = Date.now();
     }
+
+    // Giảm ngưỡng: chỉ cần 1 trong 2 điều kiện (width HOẶC lift)
+    const completed = widthIncrease > 8 || liftIncrease > 4;
 
     return { progress, completed, score: completed ? 1.0 : 0 };
   }
@@ -307,6 +389,10 @@ class ChallengeLivenessService {
     // console.log('  Need: < -25% to pass');
 
     if (offsetPercent < 0) {
+      // Track first action time ONCE khi bắt đầu quay
+      if (!this.currentChallenge.firstActionTime) {
+        this.currentChallenge.firstActionTime = Date.now();
+      }
       this.turnLeftState.minOffset = Math.min(this.turnLeftState.minOffset, offsetPercent);
       this.turnLeftState.hasMovedLeft = true;
       // console.log('  ✅ Moving LEFT! New Min:', this.turnLeftState.minOffset.toFixed(1) + '%');
@@ -366,6 +452,10 @@ class ChallengeLivenessService {
     // console.log('  Need: > 25% to pass');
 
     if (offsetPercent > 0) {
+      // Track first action time ONCE khi bắt đầu quay
+      if (!this.currentChallenge.firstActionTime) {
+        this.currentChallenge.firstActionTime = Date.now();
+      }
       this.turnRightState.maxOffset = Math.max(this.turnRightState.maxOffset, offsetPercent);
       this.turnRightState.hasMovedRight = true;
       // console.log('  ✅ Moving RIGHT! New Max:', this.turnRightState.maxOffset.toFixed(1) + '%');
@@ -405,7 +495,14 @@ class ChallengeLivenessService {
     const noseMovement = noseTip.y - this.nodState.baselineNoseY;
     const totalMovement = this.nodState.maxNoseY - this.nodState.minNoseY;
 
-    if (noseMovement > 10) this.nodState.direction = 'DOWN';
+    // Track first action time when user starts moving
+    if (Math.abs(noseMovement) > 5 && !this.currentChallenge.firstActionTime) {
+      this.currentChallenge.firstActionTime = Date.now();
+    }
+
+    if (noseMovement > 10) {
+      this.nodState.direction = 'DOWN';
+    }
     else if (noseMovement < -10) this.nodState.direction = 'UP';
 
     // console.log('⬇️ Nod - Movement:', noseMovement.toFixed(1), 'Total:', totalMovement.toFixed(1), 'Dir:', this.nodState.direction, 'Need: >20');
@@ -430,13 +527,12 @@ class ChallengeLivenessService {
     const mouthWidth = Math.abs(leftMouth.x - rightMouth.x);
     const ratio = mouthHeight / (mouthWidth + 0.001);
     
-    // console.log('😮 Open Mouth - Ratio:', ratio.toFixed(3), 'Height:', mouthHeight.toFixed(1), 'Width:', mouthWidth.toFixed(1), 'Need: >0.5');
-    
     const progress = Math.min(100, (ratio / 0.5) * 100);
     const completed = ratio > 0.5;
     
-    if (completed) {
-      // console.log('✅✅✅ MOUTH OPEN PASS! Ratio:', ratio.toFixed(3), 'Height:', mouthHeight.toFixed(1));
+    // Track first action time
+    if (ratio > 0.3 && !this.currentChallenge.firstActionTime) {
+      this.currentChallenge.firstActionTime = Date.now();
     }
     
     return { progress, completed, score: completed ? 1.0 : 0 };
@@ -448,18 +544,23 @@ class ChallengeLivenessService {
     return totalScore / this.challengeHistory.length;
   }
 
-  reset() {
-    this.currentChallenge = null;
-    this.challengeHistory = [];
+  resetStates() {
     this.eyebrowState = null;
     this.nodState = null;
     this.smileState = null;
     this.turnLeftState = null;
     this.turnRightState = null;
+  }
+
+  reset() {
+    this.currentChallenge = null;
+    this.challengeHistory = [];
+    this.resetStates();
     this.selectedChallenges = [];
     this.antiSpoofingScore = 1.0;
     this.antiSpoofingFailed = false;
     antiSpoofingService.reset();
+    advancedAntiSpoofing.reset();
   }
 }
 

@@ -13,6 +13,11 @@ interface VerifyResult {
   timeout: boolean;
   score: number;
   landmarks?: any;
+  spoofingDetected?: boolean;
+  spoofingReason?: string;
+  antiSpoofDetails?: any;
+  advancedAntiSpoofDetails?: any;
+  replayDetected?: boolean;
 }
 
 declare class ChallengeLivenessService {

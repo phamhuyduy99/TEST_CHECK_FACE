@@ -176,7 +176,56 @@ edgeDensity = edgeCount / totalPixels
 
 ---
 
-### 2.5 Challenge Response Time Analysis
+### 2.5 Moiré Pattern Detection
+
+**Mục đích:** Phát hiện vân sóng khi quay màn hình LCD/OLED
+
+**Phương pháp:**
+```javascript
+// Extract 128x128 face region
+// Laplacian operator để phát hiện high-frequency patterns
+laplacian = |4*center - top - bottom - left - right|
+highFreqCount = pixels with laplacian > 30
+moireDensity = highFreqCount / totalPixels
+
+// Màn hình: density > 0.15 (có vân sóng)
+// Da thật: density < 0.08 (không có vân sóng)
+```
+
+**Threshold:** Density > 0.15 → SCREEN DETECTED
+
+**Chống:**
+- ✅ Video trên điện thoại (vân sóng Moiré)
+- ✅ Màn hình laptop/tablet
+- ✅ Màn hình LED
+
+---
+
+### 2.6 Screen Reflection Detection
+
+**Mục đích:** Phát hiện phản chiếu sáng bất thường của màn hình
+
+**Phương pháp:**
+```javascript
+// Extract 64x64 face region
+// Phát hiện vùng sáng bất thường (reflection)
+brightPixelCount = pixels with brightness > 220 AND (R≈G≈B)
+reflectionRatio = brightPixelCount / totalPixels
+
+// Màn hình: ratio > 0.05 (có reflection)
+// Da thật: ratio < 0.02 (không có reflection)
+```
+
+**Threshold:** Ratio > 0.05 → REFLECTION DETECTED
+
+**Chống:**
+- ✅ Màn hình có phản chiếu ánh sáng
+- ✅ Video trên điện thoại giơ ra
+- ✅ Tablet/laptop
+
+---
+
+### 2.7 Challenge Response Time Analysis
 
 **Mục đích:** Phát hiện video replay với timing hoàn hảo
 
@@ -199,7 +248,7 @@ responseTime = challengeCompleteTime - challengeStartTime
 
 ---
 
-### 2.6 Session Duration Check
+### 2.8 Session Duration Check
 
 **Mục đích:** Phát hiện video ngắn loop
 
@@ -301,6 +350,8 @@ isRealPerson = finalScore > 0.7 AND antiSpoofScore > 0.7
    - ✅ Brightness variation check
    - ✅ Frame rate consistency check
    - ✅ Texture analysis (edge density)
+   - ✅ Moiré pattern detection
+   - ✅ Screen reflection detection
    - ✅ Response time validation
    - ✅ Session duration check
 
