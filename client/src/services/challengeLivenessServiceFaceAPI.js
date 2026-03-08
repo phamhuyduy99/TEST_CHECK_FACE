@@ -28,7 +28,7 @@ class ChallengeLivenessService {
 
   initializeChallenges() {
     const allChallenges = [
-      { type: 'EYEBROW_RAISE', instruction: '🤨 Nhấc lông mày 4 lần', duration: 6000, minResponseTime: 500, maxResponseTime: 6000 },
+      { type: 'EYEBROW_RAISE', instruction: '🤨 Nhấc lông mày và nhắm chặt mắt 4 lần', duration: 6000, minResponseTime: 500, maxResponseTime: 6000 },
       { type: 'SMILE', instruction: '😊 Cười', duration: 2500, minResponseTime: 200, maxResponseTime: 2500 },
       { type: 'TURN_LEFT', instruction: '⬅️ Quay đầu sang PHẢI (trên màn hình là trái)', duration: 2500, minResponseTime: 200, maxResponseTime: 2500 },
       { type: 'TURN_RIGHT', instruction: '➡️ Quay đầu sang TRÁI (trên màn hình là phải)', duration: 2500, minResponseTime: 200, maxResponseTime: 2500 },
