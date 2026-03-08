@@ -307,7 +307,8 @@ export default function Camera() {
             autoPlay
             playsInline
             muted
-            className="w-full rounded-lg bg-black aspect-video"
+            className="w-full rounded-lg bg-black md:aspect-video object-cover"
+            style={{ aspectRatio: window.innerWidth < 768 ? 'auto' : '16/9', height: window.innerWidth < 768 ? '100vh' : 'auto' }}
           />
           {recording && challenge && (() => {
             const currentChallengeIndex = challengeLivenessService.challengeHistory.length;
