@@ -23,7 +23,16 @@ export default defineConfig({
     port: 5173,
     open: true,
     hmr: true,
+    headers: {
+      'Cross-Origin-Embedder-Policy': 'require-corp',
+      'Cross-Origin-Opener-Policy': 'same-origin',
+    },
   },
+  optimizeDeps: {
+    exclude: ['faceplugin-face-recognition-js'],
+    include: ['ndarray', 'ndarray-ops'],
+  },
+  assetsInclude: ['**/*.wasm'],
   build: {
     rollupOptions: {
       output: {

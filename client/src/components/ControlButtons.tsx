@@ -9,7 +9,6 @@ interface ControlButtonsProps {
   onStopCamera: () => void;
   onStartRecording: () => void;
   onStopRecording: () => void;
-  onCaptureImage: (imageNumber: number) => void;
   onUpload: () => void;
   onResetRecording: () => void;
 }
@@ -25,7 +24,6 @@ export default function ControlButtons({
   onStopCamera,
   onStartRecording,
   onStopRecording,
-  onCaptureImage,
   onUpload,
   onResetRecording,
 }: ControlButtonsProps) {
@@ -72,25 +70,6 @@ export default function ControlButtons({
         >
           Dừng quay
         </button>
-      )}
-
-      {stream && (
-        <>
-          <button
-            onClick={() => onCaptureImage(1)}
-            className="bg-purple-600 text-white px-4 py-2.5 sm:py-3 rounded-lg hover:bg-purple-700 active:scale-95 transition-transform disabled:bg-gray-400 disabled:cursor-not-allowed disabled:transform-none text-sm sm:text-base font-medium cursor-pointer"
-            disabled={recording || !videoBlob}
-          >
-            Chụp ảnh 1 {image1 && '✓'}
-          </button>
-          <button
-            onClick={() => onCaptureImage(2)}
-            className="bg-purple-600 text-white px-4 py-2.5 sm:py-3 rounded-lg hover:bg-purple-700 active:scale-95 transition-transform disabled:bg-gray-400 disabled:cursor-not-allowed disabled:transform-none text-sm sm:text-base font-medium cursor-pointer"
-            disabled={recording || !videoBlob || !image1}
-          >
-            Chụp ảnh 2 {image2 && '✓'}
-          </button>
-        </>
       )}
 
       {videoBlob && image1 && image2 && (

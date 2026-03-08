@@ -5,6 +5,7 @@ import cors from 'cors';
 import { v2 as cloudinary, UploadApiResponse } from 'cloudinary';
 import { Readable } from 'stream';
 import { config } from './config';
+import { checkLivenessWithPython, checkPythonServerHealth } from './services/livenessService';
 
 const app = express();
 
@@ -105,6 +106,11 @@ app.post(
       });
 
       // Upload images
+      // Check liveness with Python server
+      console.log('🔍 Checking liveness with Python server...');
+      const livenessResult = await checkLivenessWithPython(files.image1[0].buffer);
+      console.log('📊 Liveness result:', livenessResult);
+
       console.log('☁️  Đang upload ảnh 1...');
       const image1Result = await uploadToCloudinary(files.image1[0].buffer, {
         resource_type: 'image',
@@ -134,6 +140,7 @@ app.post(
           publicId: image2Result.public_id,
           size: `${(image2Result.bytes / 1024).toFixed(0)} KB`
         },
+        liveness: livenessResult,
         message: 'Upload thành công lên Cloudinary'
       };
 
@@ -150,9 +157,20 @@ app.post(
   }
 );
 
-app.listen(config.port, () => {
+// Endpoint lưu kết quả liveness
+app.post('/api/liveness-result', express.json(), (req: Request, res: Response) => {
+  const { isReal, confidence, timestamp } = req.body;
+  console.log('📊 Liveness result:', { isReal, confidence, timestamp });
+  res.json({ success: true, message: 'Kết quả đã được lưu' });
+});
+
+app.listen(config.port, async () => {
   console.log(`🚀 Server running on port ${config.port}`);
   console.log(`🌍 Environment: ${config.nodeEnv}`);
   console.log(`☁️  Cloudinary: ${config.cloudinary.cloudName || '⚠️  CHƯA CẤU HÌNH'}`);
   console.log(`📤 Upload endpoint: /api/upload`);
+  console.log(`🔍 Liveness endpoint: /api/liveness-result`);
+  
+  const pythonHealthy = await checkPythonServerHealth();
+  console.log(`🐍 Python Liveness Server: ${pythonHealthy ? '✅ Connected' : '⚠️  Not running (fallback mode)'}`);
 });

@@ -1,7 +1,7 @@
 import useLivenessCapture from './hooks/useLivenessCapture';
 import useUpload from './hooks/useUpload';
 import useFaceDetection from './hooks/useFaceDetection';
-// import useMediaPipeFaceDetection from './hooks/useMediaPipeFaceDetection';
+import livenessService from './services/livenessService';
 import LoadingOverlay from './components/LoadingOverlay';
 import ErrorAlert from './components/ErrorAlert';
 import SuccessResult from './components/SuccessResult';
@@ -21,7 +21,6 @@ interface FaceDetectionInfo {
 }
 
 export default function Camera() {
-  const [faceDescriptor1, setFaceDescriptor1] = useState<Float32Array | null>(null);
   const [faceMatchResult, setFaceMatchResult] = useState<string>('');
   const [faceInfo1, setFaceInfo1] = useState<FaceDetectionInfo | null>(null);
   const [faceInfo2, setFaceInfo2] = useState<FaceDetectionInfo | null>(null);
@@ -32,6 +31,16 @@ export default function Camera() {
   const [videoPreview, setVideoPreview] = useState<string>('');
   const [faceDetectedDuringRecording, setFaceDetectedDuringRecording] = useState(false);
   const [showButtons, setShowButtons] = useState(true);
+  const [livenessStatus, setLivenessStatus] = useState<string>('');
+  const [isRealPerson, setIsRealPerson] = useState<boolean | null>(null);
+  const [livenessCanvas] = useState<HTMLCanvasElement>(() => {
+    const canvas = document.createElement('canvas');
+    canvas.getContext('2d', { alpha: false, willReadFrequently: true });
+    return canvas;
+  });
+  const [performanceMode, setPerformanceMode] = useState<'auto' | 'high' | 'low'>('auto');
+  const [realPersonDetectedCount, setRealPersonDetectedCount] = useState<number>(0);
+  const [autoCaptureDone, setAutoCaptureDone] = useState<boolean>(false);
   const {
     videoRef,
     canvasRef,
@@ -51,45 +60,164 @@ export default function Camera() {
   } = useLivenessCapture();
 
   const { uploading, uploadProgress, uploadedUrls, error, setError, uploadData } = useUpload();
-  const { modelsLoaded, detectFace, compareFaces } = useFaceDetection();
+  const { modelsLoaded, detectFace } = useFaceDetection();
   // Skip MediaPipe - chỉ dùng Face-API.js (nhanh hơn)
   // const { mediaPipeLoaded, detectFaceMediaPipe } = useMediaPipeFaceDetection();
 
+  // Auto-detect performance mode
+  useEffect(() => {
+    const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+    const cores = navigator.hardwareConcurrency || 2;
+    const memory = (navigator as { deviceMemory?: number }).deviceMemory || 4;
+
+    if (isMobile && (cores <= 4 || memory <= 4)) {
+      setPerformanceMode('low');
+      console.log('📱 Low-end device, performance mode');
+    } else if (cores >= 8 && memory >= 8) {
+      setPerformanceMode('high');
+      console.log('🚀 High-end device, quality mode');
+    } else {
+      setPerformanceMode('auto');
+      console.log('⚖️ Mid-range device, balanced mode');
+    }
+
+    livenessService.loadModels().catch(err => {
+      console.error('Faceplugin load failed:', err);
+    });
+  }, []);
+
   useEffect(() => {
     let interval: ReturnType<typeof setInterval>;
-    if (recording && modelsLoaded && videoRef.current && overlayCanvasRef) {
+    let frameCount = 0;
+    let lastFacePosition = { x: 0, y: 0 };
+    let stableFrames = 0;
+
+    if (stream && modelsLoaded && videoRef.current && overlayCanvasRef) {
       const video = videoRef.current;
       overlayCanvasRef.width = video.videoWidth;
       overlayCanvasRef.height = video.videoHeight;
+      livenessCanvas.width = video.videoWidth;
+      livenessCanvas.height = video.videoHeight;
       const ctx = overlayCanvasRef.getContext('2d');
 
+      const checkInterval =
+        performanceMode === 'low' ? 1500 : performanceMode === 'high' ? 800 : 1000;
+      const livenessFrameSkip = performanceMode === 'low' ? 4 : performanceMode === 'high' ? 2 : 3;
+
       interval = setInterval(async () => {
+        frameCount++;
+
         const faceApiDetection = await detectFace(video);
         const detected = !!faceApiDetection;
         setLiveDetection(detected);
 
         if (detected) {
           setFaceDetectedDuringRecording(true);
+
+          const box = faceApiDetection.detection.box;
+          const centerX = box.x + box.width / 2;
+          const centerY = box.y + box.height / 2;
+
+          const distance = Math.sqrt(
+            Math.pow(centerX - lastFacePosition.x, 2) + Math.pow(centerY - lastFacePosition.y, 2)
+          );
+
+          if (distance < 30) {
+            stableFrames++;
+          } else {
+            stableFrames = 0;
+          }
+
+          lastFacePosition = { x: centerX, y: centerY };
+        } else {
+          stableFrames = 0;
+        }
+
+        if (detected && frameCount % livenessFrameSkip === 0 && stableFrames >= 2) {
+          try {
+            const livenessCtx = livenessCanvas.getContext('2d', {
+              alpha: false,
+              willReadFrequently: true,
+            });
+
+            if (livenessCtx) {
+              livenessCtx.drawImage(video, 0, 0, livenessCanvas.width, livenessCanvas.height);
+
+              const box = faceApiDetection.detection.box;
+              const faceBbox = {
+                x: box.x,
+                y: box.y,
+                width: box.width,
+                height: box.height,
+              };
+
+              const livenessResult = await livenessService.checkLiveness(
+                livenessCanvas,
+                faceBbox,
+                video.videoWidth
+              );
+
+              setIsRealPerson(livenessResult.isReal);
+              setLivenessStatus(
+                livenessResult.isReal
+                  ? `✅ Người thật (${(livenessResult.confidence * 100).toFixed(0)}%)`
+                  : `❌ Giả mạo (${(livenessResult.confidence * 100).toFixed(0)}%)`
+              );
+
+              if (livenessResult.isReal && livenessResult.confidence > 0.7 && !autoCaptureDone) {
+                setRealPersonDetectedCount(prev => prev + 1);
+
+                if (realPersonDetectedCount === 1 && !image1) {
+                  captureImage(1);
+                  setMessage('✅ Tự động chụp ảnh 1!');
+                }
+
+                if (realPersonDetectedCount === 3 && image1 && !image2) {
+                  captureImage(2);
+                  setMessage('✅ Tự động chụp ảnh 2! Hoàn tất!');
+                  setAutoCaptureDone(true);
+                }
+              }
+            }
+          } catch (err) {
+            console.error('Liveness check error:', err);
+          }
         }
 
         if (faceApiDetection && ctx) {
           ctx.clearRect(0, 0, overlayCanvasRef.width, overlayCanvasRef.height);
           const box = faceApiDetection.detection.box;
-          ctx.strokeStyle = '#00ff00';
+
+          ctx.strokeStyle =
+            isRealPerson === true ? '#00ff00' : isRealPerson === false ? '#ff0000' : '#ffff00';
           ctx.lineWidth = 3;
           ctx.strokeRect(box.x, box.y, box.width, box.height);
-          ctx.fillStyle = '#ff0000';
-          faceApiDetection.landmarkPositions.forEach((point: { x: number; y: number }) => {
-            ctx.beginPath();
-            ctx.arc(point.x, point.y, 2, 0, 2 * Math.PI);
-            ctx.fill();
-          });
+
+          if (performanceMode === 'high') {
+            ctx.fillStyle = '#ff0000';
+            faceApiDetection.landmarkPositions.forEach((point: { x: number; y: number }) => {
+              ctx.beginPath();
+              ctx.arc(point.x, point.y, 2, 0, 2 * Math.PI);
+              ctx.fill();
+            });
+          }
         }
-      }, 1000);
+      }, checkInterval);
     }
-    return () => clearInterval(interval);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [recording, modelsLoaded]);
+
+    return () => {
+      if (interval) clearInterval(interval);
+      livenessService.clearCache();
+    };
+  }, [
+    stream,
+    modelsLoaded,
+    performanceMode,
+    realPersonDetectedCount,
+    image1,
+    image2,
+    autoCaptureDone,
+  ]);
 
   useEffect(() => {
     if (videoBlob) {
@@ -98,82 +226,10 @@ export default function Camera() {
       setMessage('✅ Video đã lưu thành công! Phát hiện người trong video.');
       return () => URL.revokeObjectURL(url);
     }
-  }, [videoBlob]);
-
-  const handleCaptureWithDetection = async (imageNumber: number) => {
-    if (!modelsLoaded || !videoRef.current) {
-      setMessage('⚠️ Models chưa load xong!');
-      return;
-    }
-
-    const detection = await detectFace(videoRef.current);
-    if (!detection) {
-      setMessage(
-        '🚨 KHÔNG PHÁT HIỆN KHUÔN MẶT! Vui lòng đảm bảo khuôn mặt rõ ràng trong khung hình.'
-      );
-      return;
-    }
-
-    captureImage(imageNumber);
-
-    if (imageNumber === 1) {
-      setFaceDescriptor1(detection.descriptor);
-      setFaceInfo1(detection);
-      setMessage(`✅ Ảnh 1: Phát hiện khuôn mặt thành công!`);
-
-      if (canvasRef.current) {
-        const canvas = document.createElement('canvas');
-        const ctx = canvas.getContext('2d');
-        if (ctx) {
-          canvas.width = canvasRef.current.width;
-          canvas.height = canvasRef.current.height;
-          ctx.drawImage(canvasRef.current, 0, 0);
-
-          // Vẽ bounding box
-          const box = detection.detection.box;
-          ctx.strokeStyle = '#00ff00';
-          ctx.lineWidth = 4;
-          ctx.strokeRect(box.x, box.y, box.width, box.height);
-
-          setImagePreview1(canvas.toDataURL('image/jpeg'));
-        }
-      }
-    } else {
-      setFaceInfo2(detection);
-      setMessage(`✅ Ảnh 2: Phát hiện khuôn mặt thành công!`);
-
-      if (canvasRef.current) {
-        const canvas = document.createElement('canvas');
-        const ctx = canvas.getContext('2d');
-        if (ctx) {
-          canvas.width = canvasRef.current.width;
-          canvas.height = canvasRef.current.height;
-          ctx.drawImage(canvasRef.current, 0, 0);
-
-          // Vẽ bounding box
-          const box = detection.detection.box;
-          ctx.strokeStyle = '#00ff00';
-          ctx.lineWidth = 4;
-          ctx.strokeRect(box.x, box.y, box.width, box.height);
-
-          setImagePreview2(canvas.toDataURL('image/jpeg'));
-        }
-      }
-
-      if (faceDescriptor1) {
-        const result = compareFaces(faceDescriptor1, detection.descriptor);
-        const matchText = result.match
-          ? `✅ Khớp! Độ tương đồng: ${(result.similarity * 100).toFixed(1)}%`
-          : `❌ Không khớp! Độ tương đồng: ${(result.similarity * 100).toFixed(1)}%`;
-        setFaceMatchResult(matchText);
-        setMessage(matchText);
-      }
-    }
-  };
+  }, [videoBlob, setMessage]);
 
   const handleReset = () => {
     resetRecording();
-    setFaceDescriptor1(null);
     setFaceMatchResult('');
     setFaceInfo1(null);
     setFaceInfo2(null);
@@ -182,6 +238,8 @@ export default function Camera() {
     setImagePreview2('');
     setVideoPreview('');
     setFaceDetectedDuringRecording(false);
+    setRealPersonDetectedCount(0);
+    setAutoCaptureDone(false);
   };
 
   const handleStopRecording = () => {
@@ -218,7 +276,8 @@ export default function Camera() {
               <div className="animate-spin rounded-full h-5 w-5 border-2 border-yellow-600 border-t-transparent"></div>
               <p className="font-bold text-yellow-800">Đang tải AI Models...</p>
             </div>
-            <p className="text-sm text-yellow-700">• Face-API.js (Nhận diện khuôn mặt)</p>
+            <p className="text-sm text-yellow-700">• Face-API.js (Phát hiện khuôn mặt)</p>
+            <p className="text-sm text-yellow-700">• Faceplugin SDK (Kiểm tra liveness)</p>
           </div>
         )}
 
@@ -230,32 +289,55 @@ export default function Camera() {
             muted
             className="w-full rounded-lg bg-black aspect-video"
           />
-          {recording && overlayCanvasRef && (
-            <canvas
-              ref={el => {
-                if (el && overlayCanvasRef) {
-                  el.width = overlayCanvasRef.width;
-                  el.height = overlayCanvasRef.height;
-                  const ctx = el.getContext('2d');
-                  const overlayCtx = overlayCanvasRef.getContext('2d');
-                  if (ctx && overlayCtx) {
-                    ctx.drawImage(overlayCanvasRef, 0, 0);
+          {recording &&
+            overlayCanvasRef &&
+            overlayCanvasRef.width > 0 &&
+            overlayCanvasRef.height > 0 && (
+              <canvas
+                ref={el => {
+                  if (
+                    el &&
+                    overlayCanvasRef &&
+                    overlayCanvasRef.width > 0 &&
+                    overlayCanvasRef.height > 0
+                  ) {
+                    el.width = overlayCanvasRef.width;
+                    el.height = overlayCanvasRef.height;
+                    const ctx = el.getContext('2d');
+                    const overlayCtx = overlayCanvasRef.getContext('2d');
+                    if (ctx && overlayCtx) {
+                      ctx.drawImage(overlayCanvasRef, 0, 0);
+                    }
                   }
-                }
-              }}
-              className="absolute top-0 left-0 w-full h-full pointer-events-none"
-            />
-          )}
+                }}
+                className="absolute top-0 left-0 w-full h-full pointer-events-none"
+              />
+            )}
           {recording && (
-            <div
-              className={`absolute top-4 right-4 px-4 py-3 rounded-full font-bold shadow-xl transition-all ${
-                liveDetection
-                  ? 'bg-green-500 text-white text-base sm:text-lg'
-                  : 'bg-red-600 text-white text-lg sm:text-xl animate-bounce'
-              }`}
-            >
-              {liveDetection ? '✅ Phát hiện người' : '⚠️ Không thấy người'}
-            </div>
+            <>
+              <div
+                className={`absolute top-4 right-4 px-4 py-3 rounded-full font-bold shadow-xl transition-all ${
+                  liveDetection
+                    ? 'bg-green-500 text-white text-base sm:text-lg'
+                    : 'bg-red-600 text-white text-lg sm:text-xl animate-bounce'
+                }`}
+              >
+                {liveDetection ? '✅ Phát hiện người' : '⚠️ Không thấy người'}
+              </div>
+              {livenessStatus && (
+                <div
+                  className={`absolute top-20 right-4 px-4 py-2 rounded-lg font-bold shadow-xl text-sm ${
+                    isRealPerson === true
+                      ? 'bg-blue-500 text-white'
+                      : isRealPerson === false
+                        ? 'bg-red-500 text-white'
+                        : 'bg-gray-500 text-white'
+                  }`}
+                >
+                  {livenessStatus}
+                </div>
+              )}
+            </>
           )}
           <LivenessGuide isRecording={recording} onComplete={handleStopRecording} />
           <canvas ref={canvasRef} className="hidden" />
@@ -351,7 +433,6 @@ export default function Camera() {
               onStopCamera={stopCamera}
               onStartRecording={startRecording}
               onStopRecording={handleStopRecording}
-              onCaptureImage={handleCaptureWithDetection}
               onUpload={handleUpload}
               onResetRecording={handleReset}
             />

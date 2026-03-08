@@ -19,6 +19,16 @@ interface UploadedUrls {
     publicId: string;
     size: string;
   };
+  liveness?: {
+    isReal: boolean;
+    confidence: number;
+    scores?: {
+      texture: number;
+      color: number;
+      frequency: number;
+      edge: number;
+    };
+  };
   message: string;
 }
 
