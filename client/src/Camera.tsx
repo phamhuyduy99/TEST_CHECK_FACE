@@ -59,6 +59,7 @@ export default function Camera() {
     faceLandmarks,
     spoofingDetected,
     spoofingReason,
+    justCompleted,
     startChallenge,
     reset: resetChallenge,
   } = useChallengeLiveness(videoRef, recording);
@@ -311,10 +312,8 @@ export default function Camera() {
             style={{ aspectRatio: window.innerWidth < 768 ? 'auto' : '16/9', height: window.innerWidth < 768 ? '100vh' : 'auto' }}
           />
           {recording && challenge && (() => {
-            const currentChallengeIndex = challengeLivenessService.challengeHistory.length;
-            const lastChallenge = challengeLivenessService.challengeHistory[currentChallengeIndex - 1];
-            const isLastChallengePass = lastChallenge && lastChallenge.score >= 1.0;
-            const showAsCompleted = progress >= 100 && lastChallenge && lastChallenge.type === challenge.type;
+            const showAsCompleted = justCompleted && justCompleted.type === challenge.type;
+            const isLastChallengePass = justCompleted?.passed || false;
             
             return (
               <div className="absolute top-4 left-4 right-4 z-[100] pointer-events-none">

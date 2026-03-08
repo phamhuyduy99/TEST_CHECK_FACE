@@ -21,6 +21,7 @@ export const useChallengeLiveness = (
   const [faceLandmarks, setFaceLandmarks] = useState<any>(null);
   const [spoofingDetected, setSpoofingDetected] = useState(false);
   const [spoofingReason, setSpoofingReason] = useState('');
+  const [justCompleted, setJustCompleted] = useState<{type: string; passed: boolean} | null>(null);
 
   useEffect(() => {
     challengeLivenessService.loadModels();
@@ -68,16 +69,21 @@ export const useChallengeLiveness = (
         if (result.completed || result.timeout) {
           const totalChallenges = 5;
           const currentCount = challengeLivenessService.challengeHistory.length;
+          const lastCh = challengeLivenessService.challengeHistory[currentCount - 1];
+          
+          setJustCompleted({ type: lastCh.type, passed: lastCh.score >= 1.0 });
 
           setTimeout(() => {
             if (currentCount < totalChallenges) {
               setTimeout(() => {
                 setChallenge(null);
+                setJustCompleted(null);
                 setTimeout(() => startChallenge(), 500);
               }, 2000);
             } else {
               setTimeout(() => {
                 setChallenge(null);
+                setJustCompleted(null);
                 setCompleted(true);
                 const score = challengeLivenessService.getFinalScore();
                 setFinalScore(score);
@@ -99,6 +105,7 @@ export const useChallengeLiveness = (
     setFinalScore(0);
     setSpoofingDetected(false);
     setSpoofingReason('');
+    setJustCompleted(null);
   }, []);
 
   return {
@@ -109,6 +116,7 @@ export const useChallengeLiveness = (
     faceLandmarks,
     spoofingDetected,
     spoofingReason,
+    justCompleted,
     startChallenge,
     reset,
   };
