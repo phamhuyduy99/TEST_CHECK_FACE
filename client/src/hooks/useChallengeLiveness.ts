@@ -72,7 +72,7 @@ export const useChallengeLiveness = (
           setTimeout(() => {
             setChallenge(null);
             if (currentCount < totalChallenges) {
-              setTimeout(() => startChallenge(), 300);
+              setTimeout(() => startChallenge(), 1500);
             } else {
               setCompleted(true);
               const score = challengeLivenessService.getFinalScore();
