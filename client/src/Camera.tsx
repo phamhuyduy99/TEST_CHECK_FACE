@@ -7,7 +7,6 @@ import LoadingOverlay from './components/LoadingOverlay';
 import ErrorAlert from './components/ErrorAlert';
 import SuccessResult from './components/SuccessResult';
 import ControlButtons from './components/ControlButtons';
-import LivenessGuide from './components/LivenessGuide';
 import ChallengeDisplay from './components/ChallengeDisplay';
 import FaceInfo from './components/FaceInfo';
 import { useState, useEffect } from 'react';
@@ -394,7 +393,6 @@ export default function Camera() {
           {recording && (
             <ChallengeDisplay challenge={challenge} progress={progress} completed={completed} />
           )}
-          <LivenessGuide isRecording={recording} onComplete={handleStopRecording} />
           <canvas ref={canvasRef} className="hidden" />
         </div>
 
