@@ -16,6 +16,8 @@
   "dependencies": {
     "@mediapipe/camera_utils": "^0.3.1675466862",
     "@mediapipe/face_detection": "^0.4.1646425229",
+    "@tensorflow-models/face-landmarks-detection": "^1.0.6",
+    "@tensorflow/tfjs": "^4.22.0",
     "face-api.js": "^0.22.2",
     "faceplugin-face-recognition-js": "^0.0.1",
     "react": "^19.2.0",

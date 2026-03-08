@@ -4,6 +4,10 @@ declare class LivenessService {
   offscreenCanvas: HTMLCanvasElement | null;
   lastResult: { isReal: boolean; confidence: number };
   resultCache: Map<string, { result: { isReal: boolean; confidence: number }; timestamp: number }>;
+  faceMeshModel: unknown;
+  previousLandmarks: unknown;
+  blinkCount: number;
+  lastBlinkTime: number;
 
   loadModels(): Promise<void>;
   resizeCanvas(sourceCanvas: HTMLCanvasElement, targetWidth?: number): HTMLCanvasElement;

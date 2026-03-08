@@ -1,4 +1,7 @@
 import * as faceplugin from 'faceplugin-face-recognition-js';
+import * as faceLandmarksDetection from '@tensorflow-models/face-landmarks-detection';
+import '@tensorflow/tfjs-core';
+import '@tensorflow/tfjs-backend-webgl';
 
 class LivenessService {
   constructor() {
@@ -7,11 +10,28 @@ class LivenessService {
     this.offscreenCanvas = null;
     this.lastResult = { isReal: false, confidence: 0 };
     this.resultCache = new Map();
+    this.faceMeshModel = null;
+    this.previousLandmarks = null;
+    this.blinkCount = 0;
+    this.lastBlinkTime = 0;
   }
 
   async loadModels() {
     if (this.isLoaded) return;
-    console.warn('⚠️ Faceplugin SDK có vấn đề, sử dụng heuristic liveness detection');
+    try {
+      console.log('🔄 Loading TensorFlow.js FaceMesh...');
+      this.faceMeshModel = await faceLandmarksDetection.createDetector(
+        faceLandmarksDetection.SupportedModels.MediaPipeFaceMesh,
+        {
+          runtime: 'tfjs',
+          refineLandmarks: true,
+          maxFaces: 1,
+        }
+      );
+      console.log('✅ FaceMesh loaded successfully');
+    } catch (err) {
+      console.warn('⚠️ FaceMesh load failed, using heuristic only:', err);
+    }
     this.offscreenCanvas = document.createElement('canvas');
     this.isLoaded = true;
   }
@@ -49,11 +69,104 @@ class LivenessService {
     };
   }
 
-  // Kiểm tra liveness với cache và resize
+  // Kiểm tra liveness với FaceMesh + motion detection
   async checkLiveness(canvas, faceBbox, originalWidth) {
     if (!this.isLoaded) await this.loadModels();
     if (!faceBbox) return this.lastResult;
-    return this.heuristicLiveness(canvas, faceBbox);
+
+    const heuristicResult = this.heuristicLiveness(canvas, faceBbox);
+
+    if (this.faceMeshModel) {
+      try {
+        const video = canvas;
+        const faces = await this.faceMeshModel.estimateFaces(video, { flipHorizontal: false });
+
+        if (faces && faces.length > 0) {
+          const face = faces[0];
+          const motionScore = this.detectMotion(face.keypoints);
+          const blinkScore = this.detectBlink(face.keypoints);
+          const depthScore = this.detect3DDepth(face.keypoints);
+
+          const combinedConfidence =
+            heuristicResult.confidence * 0.3 +
+            motionScore * 0.3 +
+            blinkScore * 0.2 +
+            depthScore * 0.2;
+
+          const isReal = combinedConfidence > 0.5;
+
+          return { isReal, confidence: Math.min(0.99, combinedConfidence) };
+        }
+      } catch (err) {
+        console.error('FaceMesh detection error:', err);
+      }
+    }
+
+    return heuristicResult;
+  }
+
+  // Detect motion between frames
+  detectMotion(landmarks) {
+    if (!this.previousLandmarks) {
+      this.previousLandmarks = landmarks;
+      return 0.5;
+    }
+
+    let totalMovement = 0;
+    const samplePoints = [33, 133, 362, 263, 1, 61, 291];
+
+    samplePoints.forEach(idx => {
+      if (landmarks[idx] && this.previousLandmarks[idx]) {
+        const dx = landmarks[idx].x - this.previousLandmarks[idx].x;
+        const dy = landmarks[idx].y - this.previousLandmarks[idx].y;
+        totalMovement += Math.sqrt(dx * dx + dy * dy);
+      }
+    });
+
+    this.previousLandmarks = landmarks;
+
+    const avgMovement = totalMovement / samplePoints.length;
+    return Math.min(1.0, avgMovement / 5);
+  }
+
+  // Detect eye blink
+  detectBlink(landmarks) {
+    const leftEyeTop = landmarks[159];
+    const leftEyeBottom = landmarks[145];
+    const rightEyeTop = landmarks[386];
+    const rightEyeBottom = landmarks[374];
+
+    if (!leftEyeTop || !leftEyeBottom || !rightEyeTop || !rightEyeBottom) {
+      return 0.5;
+    }
+
+    const leftEyeHeight = Math.abs(leftEyeTop.y - leftEyeBottom.y);
+    const rightEyeHeight = Math.abs(rightEyeTop.y - rightEyeBottom.y);
+    const avgEyeHeight = (leftEyeHeight + rightEyeHeight) / 2;
+
+    const now = Date.now();
+    if (avgEyeHeight < 3 && now - this.lastBlinkTime > 300) {
+      this.blinkCount++;
+      this.lastBlinkTime = now;
+      console.log('👁️ Blink detected! Count:', this.blinkCount);
+    }
+
+    return Math.min(1.0, this.blinkCount / 3);
+  }
+
+  // Detect 3D depth (real face has depth)
+  detect3DDepth(landmarks) {
+    const noseTip = landmarks[1];
+    const leftCheek = landmarks[234];
+    const rightCheek = landmarks[454];
+
+    if (!noseTip || !leftCheek || !rightCheek) return 0.5;
+
+    const faceWidth = Math.abs(leftCheek.x - rightCheek.x);
+    const noseProtrusion = Math.abs(noseTip.z || 0);
+
+    const depthRatio = noseProtrusion / (faceWidth + 1);
+    return Math.min(1.0, depthRatio * 10);
   }
 
   // Fallback: heuristic-based liveness detection
@@ -90,6 +203,8 @@ class LivenessService {
 
   clearCache() {
     this.resultCache.clear();
+    this.previousLandmarks = null;
+    this.blinkCount = 0;
   }
 }
 
