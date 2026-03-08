@@ -69,40 +69,12 @@ class LivenessService {
     };
   }
 
-  // Kiểm tra liveness với FaceMesh + motion detection
+  // Kiểm tra liveness - Chỉ dùng heuristic (không dùng FaceMesh để tránh conflict)
   async checkLiveness(canvas, faceBbox, originalWidth) {
     if (!this.isLoaded) await this.loadModels();
     if (!faceBbox) return this.lastResult;
 
-    const heuristicResult = this.heuristicLiveness(canvas, faceBbox);
-
-    if (this.faceMeshModel) {
-      try {
-        const video = canvas;
-        const faces = await this.faceMeshModel.estimateFaces(video, { flipHorizontal: false });
-
-        if (faces && faces.length > 0) {
-          const face = faces[0];
-          const motionScore = this.detectMotion(face.keypoints);
-          const blinkScore = this.detectBlink(face.keypoints);
-          const depthScore = this.detect3DDepth(face.keypoints);
-
-          const combinedConfidence =
-            heuristicResult.confidence * 0.3 +
-            motionScore * 0.3 +
-            blinkScore * 0.2 +
-            depthScore * 0.2;
-
-          const isReal = combinedConfidence > 0.5;
-
-          return { isReal, confidence: Math.min(0.99, combinedConfidence) };
-        }
-      } catch (err) {
-        console.error('FaceMesh detection error:', err);
-      }
-    }
-
-    return heuristicResult;
+    return this.heuristicLiveness(canvas, faceBbox);
   }
 
   // Detect motion between frames - Anti-static image
