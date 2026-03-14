@@ -2,11 +2,13 @@ import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import checker from 'vite-plugin-checker';
 import { visualizer } from 'rollup-plugin-visualizer';
+import basicSsl from '@vitejs/plugin-basic-ssl';
 
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [
     react(),
+    basicSsl(),
     checker({
       typescript: true,
       overlay: {
@@ -21,6 +23,7 @@ export default defineConfig({
   ],
   server: {
     port: 5173,
+    host: true,
     open: true,
     hmr: true,
     headers: {

@@ -12,6 +12,10 @@ export const config = {
     accessToken: process.env.VNPT_ACCESS_TOKEN,
   },
   cors: {
-    origin: process.env.CORS_ORIGIN || 'http://localhost:5173'  || 'http://localhost:5174'
+    origin: process.env.CORS_ORIGIN || [
+      'http://localhost:5173',
+      'http://localhost:5174',
+      'http://192.168.1.17:5173',
+    ]
   }
 };
