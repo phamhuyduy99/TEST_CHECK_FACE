@@ -1,6 +1,6 @@
 import { useRef, useState, useCallback, useEffect } from 'react';
 
-export default function useWebcam() {
+export default function useWebcam(facingMode: 'user' | 'environment' = 'user') {
   const videoRef = useRef<HTMLVideoElement>(null);
   const [stream, setStream] = useState<MediaStream | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -10,7 +10,7 @@ export default function useWebcam() {
     setError(null);
     try {
       const s = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: 'user', width: { ideal: 1280 }, height: { ideal: 720 } },
+        video: { facingMode, width: { ideal: 1280 }, height: { ideal: 720 } },
       });
       if (videoRef.current) videoRef.current.srcObject = s;
       setStream(s);
@@ -18,7 +18,7 @@ export default function useWebcam() {
     } catch {
       setError('Không thể mở camera. Kiểm tra quyền truy cập.');
     }
-  }, []);
+  }, [facingMode]);
 
   const stop = useCallback(() => {
     stream?.getTracks().forEach(t => t.stop());

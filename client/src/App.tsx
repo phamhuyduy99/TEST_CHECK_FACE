@@ -1,20 +1,20 @@
 import { lazy, Suspense } from 'react';
 
-const EkycPage = lazy(() => import('./pages/EkycPage'));
+const EkycFlowPage = lazy(() => import('./pages/EkycFlowPage'));
 
 function App() {
   return (
     <Suspense
       fallback={
-        <div className="min-h-screen bg-indigo-50 flex items-center justify-center">
-          <div className="text-center">
-            <div className="animate-spin rounded-full h-12 w-12 border-4 border-indigo-500 border-t-transparent mx-auto mb-3" />
-            <p className="text-gray-600 font-medium">Đang tải...</p>
-          </div>
+        <div className="min-h-screen flex items-center justify-center" style={{ background: '#0d1f2d' }}>
+          <svg className="animate-spin w-10 h-10 text-[#00d4a0]" viewBox="0 0 24 24" fill="none">
+            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
+          </svg>
         </div>
       }
     >
-      <EkycPage />
+      <EkycFlowPage />
     </Suspense>
   );
 }
