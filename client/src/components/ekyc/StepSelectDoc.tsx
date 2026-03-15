@@ -2,9 +2,12 @@ import { useT } from '../../i18n';
 
 interface Props {
   onSelect: (type: number, label: string) => void;
+  onNavigateSdk?: () => void;
+  onTokenSettings?: () => void;
+  onBack?: () => void;
 }
 
-export default function StepSelectDoc({ onSelect }: Props) {
+export default function StepSelectDoc({ onSelect, onTokenSettings, onBack }: Props) {
   const { t } = useT();
 
   const DOC_TYPES = [
@@ -81,6 +84,17 @@ export default function StepSelectDoc({ onSelect }: Props) {
   ];
   return (
     <div className="flex flex-col items-center justify-center min-h-screen px-4">
+      {onBack && (
+        <button
+          onClick={onBack}
+          className="absolute top-4 left-4 z-20 flex items-center gap-1.5 text-sm text-gray-400 hover:text-white transition"
+        >
+          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
+          </svg>
+          Quay lại
+        </button>
+      )}
       <h1 className="text-xl font-bold text-white mb-1">{t.selectTitle}</h1>
       <p className="text-sm text-gray-400 mb-10">{t.selectSub}</p>
 
@@ -107,6 +121,36 @@ export default function StepSelectDoc({ onSelect }: Props) {
           </button>
         ))}
       </div>
+
+      <p className="mt-8 text-xs text-gray-500 text-center">
+        <span className="text-white/70 font-semibold">Demo of Intrust</span> eKYC · Verified by{' '}
+        <span className="text-[#00d4a0] font-medium">VNPT AI</span>
+      </p>
+
+      {onTokenSettings && (
+        <button
+          onClick={onTokenSettings}
+          className="mt-3 flex items-center gap-1.5 text-xs text-gray-500 hover:text-gray-300 transition"
+        >
+          <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+            <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+          </svg>
+          Cập nhật Access Token
+        </button>
+      )}
+
+      {/* {onNavigateSdk && (
+        <button
+          onClick={onNavigateSdk}
+          className="mt-4 flex items-center gap-2 text-sm text-[#00d4a0] hover:underline"
+        >
+          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
+          </svg>
+          {t.doc0.includes('Chứng') ? 'Thử VNPT SDK (beta)' : 'Try VNPT SDK (beta)'}
+        </button>
+      )} */}
     </div>
   );
 }

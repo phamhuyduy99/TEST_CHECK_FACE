@@ -18,12 +18,32 @@ const client: AxiosInstance = axios.create({
   timeout: 20000,
   headers: {
     'Content-Type': 'application/json',
-    'Authorization': `Bearer ${ACCESS_TOKEN}`,
     'Token-id': TOKEN_ID,
     'Token-key': TOKEN_KEY,
     'mac-address': 'TEST1',
   },
 });
+
+// Cache client theo token để tránh tạo mới mỗi lần gọi
+const clientCache = new Map<string, AxiosInstance>();
+
+export function getClient(overrideToken?: string): AxiosInstance {
+  const token = overrideToken || ACCESS_TOKEN;
+  if (clientCache.has(token)) return clientCache.get(token)!;
+  const instance = axios.create({
+    baseURL: BASE_URL,
+    timeout: 20000,
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${token}`,
+      'Token-id': TOKEN_ID,
+      'Token-key': TOKEN_KEY,
+      'mac-address': 'TEST1',
+    },
+  });
+  clientCache.set(token, instance);
+  return instance;
+}
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -147,24 +167,6 @@ interface VnptErrorResponse {
   statusCode?: number;
 }
 
-/**
- * Extract errors[] từ axios error response của VNPT.
- * Thay vì throw raw axios error ("Request failed with status code 400"),
- * trả về object có errors[] để frontend hiển thị đúng thông báo.
- */
-const extractVnptError = (label: string, err: unknown): { errors: string[]; error: string } => {
-  const e = err as { response?: { data?: VnptErrorResponse }; message?: string };
-  const data = e?.response?.data;
-  console.error(`❌ VNPT [${label}]:`, data ?? e?.message);
-
-  // Lấy errors[] từ response body nếu có, fallback về message
-  const errors: string[] = data?.errors?.length
-    ? data.errors
-    : [data?.message ?? e?.message ?? 'Lỗi không xác định'];
-
-  return { errors, error: errors[0] };
-};
-
 /** Dùng cho các hàm không có fallback — vẫn throw để Promise.allSettled bắt được */
 const handleErr = (label: string, err: unknown): never => {
   const e = err as { response?: { data?: VnptErrorResponse }; message?: string };
@@ -177,30 +179,63 @@ const handleErr = (label: string, err: unknown): never => {
 export const uploadFile = async (
   buffer: Buffer,
   title = 'image',
-  description = ''
+  description = '',
+  overrideToken?: string,
+  isUpload = false   // true = ảnh từ file upload (không re-encode)
 ): Promise<UploadResult> => {
   try {
-    // Compress: resize max 1600px, jpeg quality 92 — giữ đủ chi tiết chữ cho OCR
-    const compressed = await sharp(buffer)
-      .resize({ width: 1600, height: 1600, fit: 'inside', withoutEnlargement: true })
-      .jpeg({ quality: 92 })
-      .toBuffer();
+    let finalBuffer = buffer;
+    let contentType = 'image/jpeg';
 
-    console.log(`📦 [${title}] ${buffer.length} → ${compressed.length} bytes`);
+    if (isUpload) {
+      // Ảnh upload từ file: chỉ resize nếu > 5MB để tránh timeout
+      // Không re-encode JPEG → giữ nguyên chất lượng gốc, VNPT không reject
+      const meta = await sharp(buffer).metadata();
+      const w = meta.width ?? 0;
+      const h = meta.height ?? 0;
+      console.log(`📦 [${title}] upload gốc: ${buffer.length} bytes  ${w}×${h}  ${meta.format}`);
 
+      if (buffer.length > 2 * 1024 * 1024 || w > 2000 || h > 2000) {
+        // Resize về max 1600px, quality 85 — đủ cho VNPT OCR, tránh inflate
+        const resized = await sharp(buffer)
+          .rotate()
+          .resize({ width: 1600, height: 1600, fit: 'inside', withoutEnlargement: true })
+          .jpeg({ quality: 85 })
+          .toBuffer();
+        // Chỉ dùng bản resize nếu nhỏ hơn gốc
+        finalBuffer = resized.length < buffer.length ? resized : buffer;
+        console.log(`📦 [${title}] resize: ${buffer.length} → ${finalBuffer.length} bytes`);
+      } else {
+        // Chỉ auto-rotate theo EXIF, không re-encode — giữ nguyên format gốc
+        finalBuffer = await sharp(buffer).rotate().toBuffer();
+        console.log(`📦 [${title}] giữ nguyên (chỉ rotate EXIF): ${finalBuffer.length} bytes`);
+      }
+      // Lấy lại format sau khi sharp xử lý (rotate có thể giữ nguyên format)
+      contentType = meta.format === 'png' ? 'image/png' : 'image/jpeg';
+    } else {
+      // Ảnh từ camera (canvas JPEG): resize nhẹ để tối ưu upload speed
+      finalBuffer = await sharp(buffer)
+        .resize({ width: 1920, height: 1920, fit: 'inside', withoutEnlargement: true })
+        .jpeg({ quality: 92 })
+        .toBuffer();
+      console.log(`📦 [${title}] camera: ${buffer.length} → ${finalBuffer.length} bytes`);
+    }
+
+    const ext = contentType === 'image/png' ? 'png' : 'jpg';
     const form = new FormData();
-    form.append('file', compressed, { filename: `${title}.jpg`, contentType: 'image/jpeg' });
+    form.append('file', finalBuffer, { filename: `${title}.${ext}`, contentType });
     form.append('title', title);
     form.append('description', description);
 
+    const token = overrideToken || ACCESS_TOKEN;
     const res = await axios.post(`${BASE_URL}/file-service/v1/addFile`, form, {
       headers: {
         ...form.getHeaders(),
-        Authorization: `Bearer ${ACCESS_TOKEN}`,
+        Authorization: `Bearer ${token}`,
         'Token-id': TOKEN_ID,
         'Token-key': TOKEN_KEY,
       },
-      timeout: 20000,
+      timeout: 30000,
     });
     return unwrap<UploadResult>(res.data);
   } catch (err) {
@@ -225,9 +260,9 @@ export const classifyId = async (imgHash: string): Promise<ClassifyResult> => {
 
 // ─── 3. Kiểm tra giấy tờ thật giả ───────────────────────────────────────────
 
-export const checkCardLiveness = async (imgHash: string): Promise<CardLivenessResult> => {
+export const checkCardLiveness = async (imgHash: string, overrideToken?: string): Promise<CardLivenessResult> => {
   try {
-    const res = await client.post('/ai/v1/card/liveness', {
+    const res = await getClient(overrideToken).post('/ai/v1/card/liveness', {
       img: imgHash,
       client_session: genSession(),
     });
@@ -275,10 +310,11 @@ export const ocrBack = async (imgBackHash: string, type = -1): Promise<OcrResult
 export const ocrId = async (
   imgFrontHash: string,
   imgBackHash: string,
-  type = -1
+  type = -1,
+  overrideToken?: string
 ): Promise<OcrResult> => {
   try {
-    const res = await client.post('/ai/v1/ocr/id', {
+    const res = await getClient(overrideToken).post('/ai/v1/ocr/id', {
       img_front: imgFrontHash,
       img_back: imgBackHash,
       client_session: genSession(),
@@ -297,10 +333,11 @@ export const ocrId = async (
 
 export const compareFace = async (
   imgFrontHash: string,
-  imgFaceHash: string
+  imgFaceHash: string,
+  overrideToken?: string
 ): Promise<FaceCompareResult> => {
   try {
-    const res = await client.post('/ai/v1/face/compare', {
+    const res = await getClient(overrideToken).post('/ai/v1/face/compare', {
       img_front: imgFrontHash,
       img_face: imgFaceHash,
       client_session: genSession(),
@@ -314,9 +351,9 @@ export const compareFace = async (
 
 // ─── 8. Kiểm tra mặt thật (liveness) ─────────────────────────────────────────
 
-export const checkFaceLiveness = async (imgHash: string): Promise<FaceLivenessResult> => {
+export const checkFaceLiveness = async (imgHash: string, overrideToken?: string): Promise<FaceLivenessResult> => {
   try {
-    const res = await client.post('/ai/v1/face/liveness', {
+    const res = await getClient(overrideToken).post('/ai/v1/face/liveness', {
       img: imgHash,
       client_session: genSession(),
       token: genToken(),
@@ -340,13 +377,14 @@ export const checkFaceLiveness = async (imgHash: string): Promise<FaceLivenessRe
 export const checkMask = async (
   imgHash: string,
   faceBbox?: string,
-  faceLmark?: string
+  faceLmark?: string,
+  overrideToken?: string
 ): Promise<MaskResult> => {
   try {
     const body: Record<string, unknown> = { img: imgHash, client_session: genSession() };
     if (faceBbox) body.face_bbox = faceBbox;
     if (faceLmark) body.face_lmark = faceLmark;
-    const res = await client.post('/ai/v1/face/mask', body);
+    const res = await getClient(overrideToken).post('/ai/v1/face/mask', body);
     return unwrap<MaskResult>(res.data);
   } catch (err) {
     return handleErr('checkMask', err);

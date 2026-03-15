@@ -1,8 +1,10 @@
 import { lazy, Suspense, useEffect, useState } from 'react';
+import { Routes, Route } from 'react-router-dom';
 import { LangProvider } from './i18n';
 import { useExternalScripts } from './hooks/useExternalScripts';
 
 const EkycFlowPage = lazy(() => import('./pages/EkycFlowPage'));
+// import VnptSdkPage from './pages/VnptSdkPage';
 
 function LoadingScreen() {
   const [progress, setProgress] = useState(0);
@@ -84,7 +86,10 @@ function App() {
   return (
     <LangProvider>
       <Suspense fallback={<LoadingScreen />}>
-        <EkycFlowPage />
+        <Routes>
+          <Route path="/" element={<EkycFlowPage />} />
+          {/* <Route path="/sdk" element={<VnptSdkPage />} /> */}
+        </Routes>
       </Suspense>
       {hasError && (
         <div className="fixed bottom-4 left-4 right-4 z-50 flex items-center gap-3 bg-red-900/90 border border-red-500/40 rounded-xl px-4 py-3 text-sm">

@@ -48,24 +48,47 @@ app.post(
       console.log(`[${reqId}]    back:  ${(files.back[0].size/1024).toFixed(0)}KB  ${files.back[0].mimetype}`);
       console.log(`[${reqId}]    face:  ${(files.face[0].size/1024).toFixed(0)}KB  ${files.face[0].mimetype}`);
 
+      const overrideToken = req.headers['x-vnpt-token'] as string | undefined;
+      // x-source: 'upload' khi user chọn file từ máy, 'camera' khi chụp trực tiếp
+      const source = (req.headers['x-source'] as string) || 'camera';
+      const isUpload = source === 'upload';
+      console.log(`[${reqId}] 📷 Nguồn ảnh: ${source} (isUpload=${isUpload})`);
+
       console.log(`[${reqId}] 📤 Uploading 3 ảnh lên VNPT...`);
-      const [frontUpload, backUpload, faceUpload] = await Promise.all([
-        uploadFile(files.front[0].buffer, 'front', 'Mặt trước giấy tờ'),
-        uploadFile(files.back[0].buffer, 'back', 'Mặt sau giấy tờ'),
-        uploadFile(files.face[0].buffer, 'face', 'Ảnh chân dung'),
+      const t1 = Date.now();
+      const [frontRes, backRes, faceRes] = await Promise.allSettled([
+        uploadFile(files.front[0].buffer, 'front', 'Mặt trước giấy tờ', overrideToken, isUpload),
+        uploadFile(files.back[0].buffer, 'back', 'Mặt sau giấy tờ', overrideToken, isUpload),
+        uploadFile(files.face[0].buffer, 'face', 'Ảnh chân dung', overrideToken, false),
       ]);
-      console.log(`[${reqId}] ✅ Upload xong (${Date.now()-t0}ms)`);
+      console.log(`[${reqId}] ✅ Upload xong (${Date.now()-t1}ms)`);
+
+      if (frontRes.status === 'rejected' || backRes.status === 'rejected' || faceRes.status === 'rejected') {
+        const uploadErr =
+          (frontRes.status === 'rejected' ? `front: ${frontRes.reason?.message}` : '') ||
+          (backRes.status  === 'rejected' ? `back: ${backRes.reason?.message}`   : '') ||
+          (faceRes.status  === 'rejected' ? `face: ${faceRes.reason?.message}`   : '');
+        console.error(`[${reqId}] ❌ Upload thất bại: ${uploadErr}`);
+        return res.status(502).json({ error: `Upload ảnh thất bại: ${uploadErr}` });
+      }
+
+      const frontUpload = (frontRes as PromiseFulfilledResult<Awaited<ReturnType<typeof uploadFile>>>).value;
+      const backUpload  = (backRes  as PromiseFulfilledResult<Awaited<ReturnType<typeof uploadFile>>>).value;
+      const faceUpload  = (faceRes  as PromiseFulfilledResult<Awaited<ReturnType<typeof uploadFile>>>).value;
+      console.log(`[${reqId}]    front hash: ${frontUpload.hash.slice(-20)}`);
+      console.log(`[${reqId}]    back  hash: ${backUpload.hash.slice(-20)}`);
+      console.log(`[${reqId}]    face  hash: ${faceUpload.hash.slice(-20)}`);
 
       console.log(`[${reqId}] 🔍 Gọi 5 API VNPT song song...`);
-      const t1 = Date.now();
+      const t2 = Date.now();
       const [ocr, cardLiveness, faceLiveness, mask, compare] = await Promise.allSettled([
-        ocrId(frontUpload.hash, backUpload.hash),
-        checkCardLiveness(frontUpload.hash),
-        checkFaceLiveness(faceUpload.hash),
-        checkMask(faceUpload.hash),
-        compareFace(frontUpload.hash, faceUpload.hash),
+        ocrId(frontUpload.hash, backUpload.hash, -1, overrideToken),
+        checkCardLiveness(frontUpload.hash, overrideToken),
+        checkFaceLiveness(faceUpload.hash, overrideToken),
+        checkMask(faceUpload.hash, undefined, undefined, overrideToken),
+        compareFace(frontUpload.hash, faceUpload.hash, overrideToken),
       ]);
-      console.log(`[${reqId}] ⏱  VNPT APIs: ${Date.now()-t1}ms`);
+      console.log(`[${reqId}] ⏱  VNPT APIs: ${Date.now()-t2}ms`);
       console.log(`[${reqId}]    ocr:          ${ocr.status}          ${ ocr.status==='fulfilled' ? ocr.value.msg : (ocr as PromiseRejectedResult).reason?.response?.data?.errors?.[0] ?? 'err'}`);
       console.log(`[${reqId}]    cardLiveness: ${cardLiveness.status} ${ cardLiveness.status==='fulfilled' ? cardLiveness.value.liveness : (cardLiveness as PromiseRejectedResult).reason?.response?.data?.errors?.[0] ?? 'err'}`);
       console.log(`[${reqId}]    faceLiveness: ${faceLiveness.status} ${ faceLiveness.status==='fulfilled' ? faceLiveness.value.liveness : 'err'}`);

@@ -66,8 +66,14 @@ export default function StepResult({ result, files, onReset }: Props) {
     faceLiveness?.isReal && cardLiveness?.liveness === 'success' && compare?.msg === 'MATCH';
   const isValid = (v?: string) => v === 'yes' || v === 'success' || v === 'OK';
 
+  // OCR bị reject vì chất lượng ảnh không đạt
+  const ocrQualityFail =
+    ocr?.msg !== 'OK' &&
+    (ocr?.errors?.some(e => /ch.t l.+ng|quality/i.test(e)) ||
+      /ch.t l.+ng|quality/i.test(ocr?.error ?? ''));
+
   return (
-    <div className="flex flex-col items-center min-h-screen px-4 pt-6 pb-10">
+    <div className="flex flex-col items-center min-h-screen px-4 pt-16 pb-10">
       <div className="w-full max-w-lg space-y-4">
         {/* Header */}
         <div
@@ -88,7 +94,10 @@ export default function StepResult({ result, files, onReset }: Props) {
             />
           )}
           {faceLiveness && !faceLiveness.error && (
-            <StatusBadge ok={faceLiveness.isReal} label={faceLiveness.liveness_msg} />
+            <StatusBadge
+              ok={faceLiveness.isReal}
+              label={faceLiveness.isReal ? t.faceReal : t.faceFake}
+            />
           )}
           {mask && !mask.error && (
             <StatusBadge
@@ -103,6 +112,22 @@ export default function StepResult({ result, files, onReset }: Props) {
             />
           )}
         </div>
+
+        {/* Giải thích khi cardLiveness fail */}
+        {cardLiveness && cardLiveness.liveness !== 'success' && !cardLiveness.error && (
+          <div className="flex items-start gap-2 bg-yellow-500/10 border border-yellow-500/30 rounded-xl px-3 py-2.5">
+            <span className="text-yellow-400 text-base shrink-0">💡</span>
+            <p className="text-yellow-200 text-xs leading-relaxed">{t.cardFakeNote}</p>
+          </div>
+        )}
+
+        {/* Cảnh báo chất lượng ảnh OCR */}
+        {ocrQualityFail && (
+          <div className="flex items-start gap-2 bg-orange-500/10 border border-orange-500/30 rounded-xl px-3 py-2.5">
+            <span className="text-orange-400 text-base shrink-0">📷</span>
+            <p className="text-orange-200 text-xs leading-relaxed">{t.ocrQualityNote}</p>
+          </div>
+        )}
 
         {/* Tabs */}
         <div className="flex rounded-xl overflow-hidden border border-white/10">

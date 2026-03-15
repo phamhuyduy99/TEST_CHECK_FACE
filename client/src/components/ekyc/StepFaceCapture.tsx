@@ -134,8 +134,9 @@ function analyzeFace(video: HTMLVideoElement, canvas: HTMLCanvasElement): FaceSt
 // PROPS
 // ─────────────────────────────────────────────────────────────────────────────
 interface Props {
-  onNext: (file: File) => void; // callback khi chụp xong, trả về File ảnh
-  onGuide: () => void; // mở lại FaceGuideModal
+  onNext: (file: File) => void;
+  onBack?: () => void;
+  onGuide: () => void;
   step?: number;
   totalSteps?: number;
 }
@@ -143,11 +144,11 @@ interface Props {
 // ─────────────────────────────────────────────────────────────────────────────
 // COMPONENT
 // ─────────────────────────────────────────────────────────────────────────────
-export default function StepFaceCapture({ onNext, onGuide, step = 3, totalSteps = 4 }: Props) {
+export default function StepFaceCapture({ onNext, onBack, onGuide, step = 3, totalSteps = 4 }: Props) {
   // ── Webcam hook: dùng camera trước (user) cho selfie ──────────────────────
   // autoStart=false: tránh gọi camera trước user gesture → browser từ chối
   // Component này chỉ render sau khi user bấm “TÔI ĐÃ HIỂU” nên đã có gesture
-  const { videoRef, active, error, capture, stop, start } = useWebcam('user', false);
+  const { videoRef, setVideoRef, active, error, captureHQ, stop, start } = useWebcam('user', false);
 
   // Gọi start() ngay khi mount — lúc này đã có user gesture nên browser cho phép
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -188,16 +189,16 @@ export default function StepFaceCapture({ onNext, onGuide, step = 3, totalSteps 
 
   // ─── Hàm chụp ảnh: chuyển phase → Capturing → gọi capture() → onNext ────
   const doCapture = useCallback(() => {
-    if (capturedRef.current) return; // tránh chụp 2 lần
+    if (capturedRef.current) return;
     capturedRef.current = true;
     setPhase(Phase.Capturing);
 
-    // Chờ 1 frame để React render spinner trước khi capture (tránh freeze UI)
     requestAnimationFrame(() => {
-      setTimeout(() => {
-        const file = capture();
+      setTimeout(async () => {
+        // Dùng captureHQ() ưu tiên — raw frame qua ImageCapture API
+        // Fallback tự động về capture() nếu không hỗ trợ
+        const file = await captureHQ(224 / 294);
         if (!file) {
-          // Capture thất bại → reset để thử lại
           capturedRef.current = false;
           goodFrameCount.current = 0;
           setPhase(Phase.Detecting);
@@ -207,7 +208,7 @@ export default function StepFaceCapture({ onNext, onGuide, step = 3, totalSteps 
         onNext(file);
       }, 150);
     });
-  }, [capture, stop, onNext]);
+  }, [captureHQ, stop, onNext]);
 
   // ─── Detection loop: chạy khi phase = Detecting ──────────────────────────
   useEffect(() => {
@@ -256,7 +257,7 @@ export default function StepFaceCapture({ onNext, onGuide, step = 3, totalSteps 
 
   return (
     <div
-      className="flex flex-col items-center min-h-screen px-4 pt-8 pb-6"
+      className="relative flex flex-col items-center min-h-screen px-4 pt-8 pb-6"
       style={{ background: 'linear-gradient(135deg, #0d1f2d 0%, #0a2a3a 50%, #0d1f2d 100%)' }}
     >
       {/* ── Tiêu đề ── */}
@@ -266,6 +267,18 @@ export default function StepFaceCapture({ onNext, onGuide, step = 3, totalSteps 
 
       {/* ── Progress bar ── */}
       <StepProgress current={step} total={totalSteps} />
+
+      {onBack && (
+        <button
+          onClick={() => { stop(); onBack(); }}
+          className="absolute top-4 left-4 flex items-center gap-1.5 text-sm text-gray-400 hover:text-white transition"
+        >
+          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
+          </svg>
+          Quay lại
+        </button>
+      )}
 
       {/* ── Hint message ──
           - Phase.Loading   : không hiện gì
@@ -396,14 +409,14 @@ export default function StepFaceCapture({ onNext, onGuide, step = 3, totalSteps 
 
           {/* Video stream từ camera trước (mirror CSS để tự nhiên hơn) */}
           <video
-            ref={videoRef}
+            ref={setVideoRef}
             autoPlay
             playsInline
             muted
             className="w-full h-full object-cover"
             style={{
               display: active ? 'block' : 'none',
-              transform: 'scaleX(-1)' /* mirror camera trước */,
+              transform: 'scaleX(-1)',
             }}
           />
         </div>
@@ -420,7 +433,11 @@ export default function StepFaceCapture({ onNext, onGuide, step = 3, totalSteps 
       {/* ── Lỗi camera: hiện thông báo + nút thử lại để hỏi lại quyền ── */}
       {error && (
         <div className="flex flex-col items-center gap-3 mt-4">
-          <p className="text-red-400 text-xs text-center max-w-xs">{error}</p>
+          <p className="text-red-400 text-xs text-center max-w-xs">
+            {error === 'camera_denied' ? t.cameraErrorDenied
+              : error === 'camera_not_found' ? t.cameraErrorNotFound
+              : t.cameraError}
+          </p>
           {/* Nhấn nút này sẽ gọi getUserMedia lại → browser hiện popup hỏi quyền */}
           <button
             onClick={() => start()}

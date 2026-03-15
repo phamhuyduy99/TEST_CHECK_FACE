@@ -49,7 +49,11 @@ const vi = {
   masked: 'Đang che mặt',
   faceMatch: 'Khớp mặt',
   cardReal: 'Giấy tờ thật',
-  cardFake: 'Không phải giấy tờ thật — vui lòng chụp giấy tờ vật lý',
+  cardFake: 'Không phải giấy tờ thật',
+  cardFakeNote: 'Hệ thống phát hiện ảnh chụp qua màn hình hoặc photocopy. Vui lòng dùng thẻ CCCD/CMND vật lý thật khi chụp.',
+  ocrQualityNote: 'Ảnh giấy tờ chưa đạt chất lượng để đọc thông tin (mờ, thiếu sáng, hoặc bị cắt góc). Vui lòng chụp lại rõ hơn.',
+  faceReal: 'Người thật',
+  faceFake: 'Ảnh/video giả',
   retryBtn: 'Thực hiện lại',
   // Tabs
   tabPersonalInfo: 'Thông tin cá nhân',
@@ -101,6 +105,12 @@ const vi = {
   hintGood: 'Giữ vững khuôn mặt',
   allowCamera: 'Cấp quyền camera',
   uploadTypeError: 'Chỉ hỗ trợ JPG, JPEG, PNG. Vui lòng chọn ảnh khác.',
+  uploadSizeError: 'Ảnh quá lớn (tối đa 10MB). Vui lòng chọn ảnh khác.',
+  uploadTooSmall: 'Ảnh quá nhỏ, vui lòng chụp lại rõ hơn (tối thiểu 100KB).',
+  cameraError: 'Không thể mở camera. Kiểm tra quyền truy cập.',
+  cameraErrorDenied: 'Bạn đã từ chối quyền camera. Vào cài đặt trình duyệt để cấp lại.',
+  cameraErrorNotFound: 'Không tìm thấy camera trên thiết bị này.',
+  startingCamera: 'Đang khởi động camera...',
 };
 
 const en: typeof vi = {
@@ -149,7 +159,11 @@ const en: typeof vi = {
   masked: 'Mask detected',
   faceMatch: 'Face match',
   cardReal: 'Genuine document',
-  cardFake: 'Not a real document — please use a physical ID',
+  cardFake: 'Not a real document',
+  cardFakeNote: 'System detected a screen capture or photocopy. Please use a physical ID card.',
+  ocrQualityNote: 'Document image quality is insufficient (blurry, poor lighting, or cropped). Please retake a clearer photo.',
+  faceReal: 'Real person',
+  faceFake: 'Fake photo/video',
   retryBtn: 'Try Again',
   // Tabs
   tabPersonalInfo: 'Personal Info',
@@ -199,6 +213,12 @@ const en: typeof vi = {
   hintGood: 'Hold still',
   allowCamera: 'Allow Camera Access',
   uploadTypeError: 'Only JPG, JPEG, PNG are supported. Please choose another image.',
+  uploadSizeError: 'Image too large (max 10MB). Please choose another image.',
+  uploadTooSmall: 'Image too small, please retake a clearer photo (min 100KB).',
+  cameraError: 'Cannot open camera. Check your permissions.',
+  cameraErrorDenied: 'Camera permission denied. Go to browser settings to allow it.',
+  cameraErrorNotFound: 'No camera found on this device.',
+  startingCamera: 'Starting camera...',
 };
 
 type Lang = 'vi' | 'en';

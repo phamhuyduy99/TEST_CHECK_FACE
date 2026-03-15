@@ -55,14 +55,14 @@ export default function useEkyc() {
   const [result, setResult] = useState<EkycResult | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const runEkyc = async (front: File, back: File, face: File) => {
+  const runEkyc = async (front: File, back: File, face: File, source: 'camera' | 'upload' = 'camera') => {
     setLoading(true);
     setResult(null);
     setError(null);
 
     console.log(`[eKYC] 🚀 Gửi request → ${API_URL}/api/ekyc`);
     console.log(
-      `[eKYC] 📸 Ảnh: front=${(front.size / 1024).toFixed(0)}KB  back=${(back.size / 1024).toFixed(0)}KB  face=${(face.size / 1024).toFixed(0)}KB`
+      `[eKYC] 📸 Ảnh: front=${(front.size / 1024).toFixed(0)}KB  back=${(back.size / 1024).toFixed(0)}KB  face=${(face.size / 1024).toFixed(0)}KB  source=${source}`
     );
 
     const form = new FormData();
@@ -70,10 +70,18 @@ export default function useEkyc() {
     form.append('back', back);
     form.append('face', face);
 
+    const headers: Record<string, string> = { 'x-source': source };
+    const savedToken = localStorage.getItem('vnpt_access_token');
+    if (savedToken) headers['x-vnpt-token'] = savedToken;
+
     const t0 = Date.now();
     try {
-      const res = await fetch(`${API_URL}/api/ekyc`, { method: 'POST', body: form });
+      const res = await fetch(`${API_URL}/api/ekyc`, { method: 'POST', body: form, headers });
       console.log(`[eKYC] ⏱  Response: HTTP ${res.status} (${Date.now() - t0}ms)`);
+      if (res.status === 401) {
+        window.dispatchEvent(new CustomEvent('vnpt-token-expired'));
+        throw new Error('Token hết hạn. Vui lòng cập nhật Access Token.');
+      }
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Lỗi server');
       console.log('[eKYC] ✅ Kết quả:', {

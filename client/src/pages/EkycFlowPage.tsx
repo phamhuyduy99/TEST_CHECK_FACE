@@ -1,16 +1,19 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import StepSelectDoc from '../components/ekyc/StepSelectDoc';
 import GuideModal from '../components/ekyc/GuideModal';
 import FaceGuideModal from '../components/ekyc/FaceGuideModal';
 import StepCapture from '../components/ekyc/StepCapture';
 import StepFaceCapture from '../components/ekyc/StepFaceCapture';
 import StepResult from '../components/ekyc/StepResult';
+import TokenModal from '../components/ekyc/TokenModal';
 import useEkyc from '../hooks/useEkyc';
 import { useT } from '../i18n';
 
 type Screen = 'select' | 'guide' | 'front' | 'back' | 'face' | 'processing' | 'result';
 
 export default function EkycFlowPage() {
+  const navigate = useNavigate();
   const [screen, setScreen] = useState<Screen>('select');
   const [_docType, setDocType] = useState(-1);
   const [docLabel, setDocLabel] = useState('');
@@ -18,8 +21,18 @@ export default function EkycFlowPage() {
   const [showFaceGuide, setShowFaceGuide] = useState(false);
   const [faceReady, setFaceReady] = useState(false);
   const [files, setFiles] = useState<{ front?: File; back?: File; face?: File }>({});
+  const [captureSource, setCaptureSource] = useState<'camera' | 'upload'>('camera');
   const { result, error, runEkyc, setResult } = useEkyc();
   const { lang, setLang, t } = useT();
+
+  const [showTokenModal, setShowTokenModal] = useState(false);
+
+  // Tự hiện popup khi server trả 401
+  useEffect(() => {
+    const handler = () => setShowTokenModal(true);
+    window.addEventListener('vnpt-token-expired', handler);
+    return () => window.removeEventListener('vnpt-token-expired', handler);
+  }, []);
 
   const handleSelectDoc = (type: number, label: string) => {
     setDocType(type);
@@ -32,12 +45,15 @@ export default function EkycFlowPage() {
     setScreen('front');
   };
 
-  const handleFront = (file: File) => {
+  const handleFront = (file: File, source: 'camera' | 'upload') => {
+    setCaptureSource(source);
     setFiles(p => ({ ...p, front: file }));
     setScreen('back');
   };
 
-  const handleBack = (file: File) => {
+  const handleBack = (file: File, source: 'camera' | 'upload') => {
+    // Nếu back là upload thì override source (cả 2 ảnh giấy tờ cùng loại)
+    if (source === 'upload') setCaptureSource('upload');
     setFiles(p => ({ ...p, back: file }));
     setShowFaceGuide(true);
     setFaceReady(false);
@@ -48,8 +64,11 @@ export default function EkycFlowPage() {
     const updated = { ...files, face: file };
     setFiles(updated);
     setScreen('processing');
-    await runEkyc(updated.front!, updated.back!, file);
-    setScreen('result');
+    try {
+      await runEkyc(updated.front!, updated.back!, file, captureSource);
+    } finally {
+      setScreen('result');
+    }
   };
 
   const handleRetryFromError = () => {
@@ -102,15 +121,23 @@ export default function EkycFlowPage() {
 
       {/* Content */}
       <div className="relative z-10">
-        {screen === 'select' && <StepSelectDoc onSelect={handleSelectDoc} />}
+        {screen === 'select' && (
+          <StepSelectDoc
+            onSelect={handleSelectDoc}
+            onNavigateSdk={() => navigate('/sdk')}
+            onTokenSettings={() => setShowTokenModal(true)}
+          />
+        )}
 
         {screen === 'front' && (
           <StepCapture
             title={t.captureFront}
             step={1}
             onNext={handleFront}
+            onBack={() => setScreen('select')}
             onGuide={() => setShowGuide(true)}
             facingMode="environment"
+            initialFile={files.front}
           />
         )}
 
@@ -119,14 +146,17 @@ export default function EkycFlowPage() {
             title={t.captureBack}
             step={2}
             onNext={handleBack}
+            onBack={() => setScreen('front')}
             onGuide={() => setShowGuide(true)}
             facingMode="environment"
+            initialFile={files.back}
           />
         )}
 
         {screen === 'face' && faceReady && (
           <StepFaceCapture
             onNext={handleFace}
+            onBack={() => { setFaceReady(false); setScreen('back'); }}
             onGuide={() => setShowFaceGuide(true)}
             step={3}
             totalSteps={4}
@@ -194,6 +224,14 @@ export default function EkycFlowPage() {
           </div>
         )}
       </div>
+
+      {/* Token modal */}
+      {showTokenModal && (
+        <TokenModal
+          onClose={() => setShowTokenModal(false)}
+          onSave={() => setShowTokenModal(false)}
+        />
+      )}
 
       {/* Face guide modal */}
       {showFaceGuide && (
