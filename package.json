@@ -3,12 +3,13 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
-    "setup": "npm install && cd server && npm install && cd ../client && npm install && cd ../python-liveness-server && python -m venv venv && venv\\Scripts\\pip install -r requirements.txt",
+    "setup": "npm install && cd server && npm install && cd ../client && npm install",
     "dev:client": "cd client && npm run dev",
     "dev:server": "cd server && npm run dev",
-    "dev:python": "cd python-liveness-server && venv\\Scripts\\python app.py",
-    "dev": "concurrently \"npm run dev:server\" \"npm run dev:client\" \"npm run dev:python\"",
-    "dev:no-python": "concurrently \"npm run dev:server\" \"npm run dev:client\""
+    "dev": "concurrently \"npm run dev:server\" \"npm run dev:client\"",
+    "build": "cd client && npm run build",
+    "preview": "concurrently \"npm run dev:server\" \"cd client && npm run preview\"",
+    "watch": "concurrently \"npm run dev:server\" \"cd client && npm run build -- --watch\" \"sleep 3 && cd client && npm run preview\""
   },
   "devDependencies": {
     "concurrently": "^8.2.2"

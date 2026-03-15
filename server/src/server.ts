@@ -2,175 +2,179 @@ import 'dotenv/config';
 import express, { Request, Response } from 'express';
 import multer from 'multer';
 import cors from 'cors';
-import { v2 as cloudinary, UploadApiResponse } from 'cloudinary';
-import { Readable } from 'stream';
 import { config } from './config';
-import { checkLivenessWithPython, checkPythonServerHealth } from './services/livenessService';
+import {
+  uploadFile,
+  checkCardLiveness,
+  ocrId,
+  checkFaceLiveness,
+  checkMask,
+  compareFace,
+} from './services/vnptAiService';
 
 const app = express();
 
-app.use(cors({
-  origin: config.cors.origin,
-  methods: ['GET', 'POST', 'PUT', 'DELETE'],
-  credentials: true
-}));
+app.use(cors({ origin: config.cors.origin, methods: ['GET', 'POST'], credentials: true }));
 app.use(express.json());
 
-// Cloudinary configuration
-cloudinary.config({
-  cloud_name: config.cloudinary.cloudName,
-  api_key: config.cloudinary.apiKey,
-  api_secret: config.cloudinary.apiSecret,
-  timeout: 120000
-});
-
-// Multer memory storage
 const upload = multer({
   storage: multer.memoryStorage(),
-  limits: { fileSize: 50 * 1024 * 1024 }
+  limits: { fileSize: 10 * 1024 * 1024 }, // 10MB
 });
 
-interface CloudinaryOptions {
-  resource_type: 'video' | 'image';
-  folder: string;
-  chunk_size?: number;
-  timeout?: number;
-}
-
-// Upload to Cloudinary with retry
-const uploadToCloudinary = (
-  buffer: Buffer,
-  options: CloudinaryOptions,
-  retries = 3
-): Promise<UploadApiResponse> => {
-  return new Promise((resolve, reject) => {
-    const attemptUpload = (attemptsLeft: number) => {
-      const stream = cloudinary.uploader.upload_stream(
-        { ...options, timeout: 120000 },
-        (error, result) => {
-          if (error) {
-            console.error(`❌ Lỗi upload (còn ${attemptsLeft} lần thử):`, error.message);
-            if (attemptsLeft > 0) {
-              console.log(`🔄 Thử lại...`);
-              setTimeout(() => attemptUpload(attemptsLeft - 1), 2000);
-            } else {
-              reject(error);
-            }
-          } else if (result) {
-            resolve(result);
-          }
-        }
-      );
-      Readable.from(buffer).pipe(stream);
-    };
-    attemptUpload(retries);
-  });
-};
-
-interface UploadFiles {
-  video?: Express.Multer.File[];
-  image1?: Express.Multer.File[];
-  image2?: Express.Multer.File[];
-}
-
+// ─── POST /api/ekyc ───────────────────────────────────────────────────────────
+// Form-data: front (File), back (File), face (File)
+// Luồng: upload 3 ảnh → OCR → liveness card → liveness face → mask → compare
 app.post(
-  '/api/upload',
+  '/api/ekyc',
   upload.fields([
-    { name: 'video', maxCount: 1 },
-    { name: 'image1', maxCount: 1 },
-    { name: 'image2', maxCount: 1 }
+    { name: 'front', maxCount: 1 },
+    { name: 'back', maxCount: 1 },
+    { name: 'face', maxCount: 1 },
   ]),
   async (req: Request, res: Response) => {
+    const reqId = Math.random().toString(36).slice(2, 8).toUpperCase();
+    const t0 = Date.now();
+    console.log(`\n[${reqId}] ▶ POST /api/ekyc`);
     try {
-      console.log('📥 Nhận request upload từ:', req.headers.origin);
+      const files = req.files as Record<string, Express.Multer.File[]>;
 
-      const files = req.files as UploadFiles;
-
-      if (!files?.video || !files?.image1 || !files?.image2) {
-        console.log('❌ Thiếu file:', { video: !!files?.video, image1: !!files?.image1, image2: !!files?.image2 });
-        return res.status(400).json({ error: 'Thiếu file video hoặc ảnh' });
+      if (!files?.front || !files?.back || !files?.face) {
+        return res.status(400).json({ error: 'Cần gửi đủ 3 ảnh: front, back, face' });
       }
 
-      console.log('📦 File sizes:', {
-        video: `${(files.video[0].size / 1024 / 1024).toFixed(2)} MB`,
-        image1: `${(files.image1[0].size / 1024).toFixed(0)} KB`,
-        image2: `${(files.image2[0].size / 1024).toFixed(0)} KB`
-      });
+      console.log(`[${reqId}] 📸 Ảnh nhận được:`);
+      console.log(`[${reqId}]    front: ${(files.front[0].size/1024).toFixed(0)}KB  ${files.front[0].mimetype}`);
+      console.log(`[${reqId}]    back:  ${(files.back[0].size/1024).toFixed(0)}KB  ${files.back[0].mimetype}`);
+      console.log(`[${reqId}]    face:  ${(files.face[0].size/1024).toFixed(0)}KB  ${files.face[0].mimetype}`);
 
-      // Upload video
-      console.log('☁️  Đang upload video lên Cloudinary...');
-      const videoResult = await uploadToCloudinary(files.video[0].buffer, {
-        resource_type: 'video',
-        folder: 'liveness-check/videos',
-        chunk_size: 6000000
-      });
+      const overrideToken = req.headers['x-vnpt-token'] as string | undefined;
+      // x-source: 'upload' khi user chọn file từ máy, 'camera' khi chụp trực tiếp
+      const source = (req.headers['x-source'] as string) || 'camera';
+      const isUpload = source === 'upload';
+      console.log(`[${reqId}] 📷 Nguồn ảnh: ${source} (isUpload=${isUpload})`);
 
-      // Upload images
-      // Check liveness with Python server
-      console.log('🔍 Checking liveness with Python server...');
-      const livenessResult = await checkLivenessWithPython(files.image1[0].buffer);
-      console.log('📊 Liveness result:', livenessResult);
+      console.log(`[${reqId}] 📤 Uploading 3 ảnh lên VNPT...`);
+      const t1 = Date.now();
+      const [frontRes, backRes, faceRes] = await Promise.allSettled([
+        uploadFile(files.front[0].buffer, 'front', 'Mặt trước giấy tờ', overrideToken, isUpload),
+        uploadFile(files.back[0].buffer, 'back', 'Mặt sau giấy tờ', overrideToken, isUpload),
+        uploadFile(files.face[0].buffer, 'face', 'Ảnh chân dung', overrideToken, false),
+      ]);
+      console.log(`[${reqId}] ✅ Upload xong (${Date.now()-t1}ms)`);
 
-      console.log('☁️  Đang upload ảnh 1...');
-      const image1Result = await uploadToCloudinary(files.image1[0].buffer, {
-        resource_type: 'image',
-        folder: 'liveness-check/images'
-      });
+      if (frontRes.status === 'rejected' || backRes.status === 'rejected' || faceRes.status === 'rejected') {
+        const uploadErr =
+          (frontRes.status === 'rejected' ? `front: ${frontRes.reason?.message}` : '') ||
+          (backRes.status  === 'rejected' ? `back: ${backRes.reason?.message}`   : '') ||
+          (faceRes.status  === 'rejected' ? `face: ${faceRes.reason?.message}`   : '');
+        console.error(`[${reqId}] ❌ Upload thất bại: ${uploadErr}`);
+        return res.status(502).json({ error: `Upload ảnh thất bại: ${uploadErr}` });
+      }
 
-      console.log('☁️  Đang upload ảnh 2...');
-      const image2Result = await uploadToCloudinary(files.image2[0].buffer, {
-        resource_type: 'image',
-        folder: 'liveness-check/images'
-      });
+      const frontUpload = (frontRes as PromiseFulfilledResult<Awaited<ReturnType<typeof uploadFile>>>).value;
+      const backUpload  = (backRes  as PromiseFulfilledResult<Awaited<ReturnType<typeof uploadFile>>>).value;
+      const faceUpload  = (faceRes  as PromiseFulfilledResult<Awaited<ReturnType<typeof uploadFile>>>).value;
+      console.log(`[${reqId}]    front hash: ${frontUpload.hash.slice(-20)}`);
+      console.log(`[${reqId}]    back  hash: ${backUpload.hash.slice(-20)}`);
+      console.log(`[${reqId}]    face  hash: ${faceUpload.hash.slice(-20)}`);
 
-      const result = {
-        video: {
-          url: videoResult.secure_url,
-          publicId: videoResult.public_id,
-          size: `${(videoResult.bytes / 1024 / 1024).toFixed(2)} MB`,
-          duration: `${videoResult.duration?.toFixed(1)}s`
-        },
-        image1: {
-          url: image1Result.secure_url,
-          publicId: image1Result.public_id,
-          size: `${(image1Result.bytes / 1024).toFixed(0)} KB`
-        },
-        image2: {
-          url: image2Result.secure_url,
-          publicId: image2Result.public_id,
-          size: `${(image2Result.bytes / 1024).toFixed(0)} KB`
-        },
-        liveness: livenessResult,
-        message: 'Upload thành công lên Cloudinary'
+      console.log(`[${reqId}] 🔍 Gọi 5 API VNPT song song...`);
+      const t2 = Date.now();
+      const [ocr, cardLiveness, faceLiveness, mask, compare] = await Promise.allSettled([
+        ocrId(frontUpload.hash, backUpload.hash, -1, overrideToken),
+        checkCardLiveness(frontUpload.hash, overrideToken),
+        checkFaceLiveness(faceUpload.hash, overrideToken),
+        checkMask(faceUpload.hash, undefined, undefined, overrideToken),
+        compareFace(frontUpload.hash, faceUpload.hash, overrideToken),
+      ]);
+      console.log(`[${reqId}] ⏱  VNPT APIs: ${Date.now()-t2}ms`);
+      console.log(`[${reqId}]    ocr:          ${ocr.status}          ${ ocr.status==='fulfilled' ? ocr.value.msg : (ocr as PromiseRejectedResult).reason?.response?.data?.errors?.[0] ?? 'err'}`);
+      console.log(`[${reqId}]    cardLiveness: ${cardLiveness.status} ${ cardLiveness.status==='fulfilled' ? cardLiveness.value.liveness : (cardLiveness as PromiseRejectedResult).reason?.response?.data?.errors?.[0] ?? 'err'}`);
+      console.log(`[${reqId}]    faceLiveness: ${faceLiveness.status} ${ faceLiveness.status==='fulfilled' ? faceLiveness.value.liveness : 'err'}`);
+      console.log(`[${reqId}]    mask:         ${mask.status}         ${ mask.status==='fulfilled' ? mask.value.masked : (mask as PromiseRejectedResult).reason?.response?.data?.errors?.[0] ?? 'err'}`);
+      console.log(`[${reqId}]    compare:      ${compare.status}      ${ compare.status==='fulfilled' ? `${compare.value.msg} ${compare.value.prob?.toFixed(1)}%` : (compare as PromiseRejectedResult).reason?.response?.data?.errors?.[0] ?? 'err'}`);
+
+      // Helper: extract errors[] từ axios rejected reason
+      // VNPT trả về errors[] trong response.data khi HTTP 4xx
+      const extractErr = (reason: unknown) => {
+        const r = reason as { response?: { data?: { errors?: string[]; message?: string } }; message?: string };
+        const data = r?.response?.data;
+        const errors: string[] = data?.errors?.length
+          ? data.errors
+          : [data?.message ?? r?.message ?? 'Lỗi không xác định'];
+        return { errors, error: errors[0] };
       };
 
-      console.log('✅ Upload thành công!');
+      const result = {
+        ocr:          ocr.status          === 'fulfilled' ? ocr.value          : extractErr((ocr as PromiseRejectedResult).reason),
+        cardLiveness: cardLiveness.status === 'fulfilled' ? cardLiveness.value : extractErr((cardLiveness as PromiseRejectedResult).reason),
+        faceLiveness: faceLiveness.status === 'fulfilled' ? faceLiveness.value : { isReal: false, ...extractErr((faceLiveness as PromiseRejectedResult).reason) },
+        mask:         mask.status         === 'fulfilled' ? mask.value         : extractErr((mask as PromiseRejectedResult).reason),
+        compare:      compare.status      === 'fulfilled' ? compare.value      : extractErr((compare as PromiseRejectedResult).reason),
+        hashes: {
+          front: frontUpload.hash,
+          back:  backUpload.hash,
+          face:  faceUpload.hash,
+        },
+      };
+
+      console.log(`[${reqId}] ✅ eKYC hoàn tất — tổng ${Date.now()-t0}ms`);
       res.json(result);
-    } catch (error) {
-      console.error('❌ Lỗi upload:', error);
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      res.status(500).json({
-        error: 'Lỗi upload lên Cloudinary',
-        details: errorMessage
-      });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Unknown error';
+      console.error(`❌ eKYC error:`, msg);
+      res.status(500).json({ error: msg });
     }
   }
 );
 
-// Endpoint lưu kết quả liveness
-app.post('/api/liveness-result', express.json(), (req: Request, res: Response) => {
-  const { isReal, confidence, timestamp } = req.body;
-  console.log('📊 Liveness result:', { isReal, confidence, timestamp });
-  res.json({ success: true, message: 'Kết quả đã được lưu' });
+// ─── POST /api/ekyc/face ──────────────────────────────────────────────────────
+// Chỉ check liveness mặt (không cần giấy tờ)
+app.post('/api/ekyc/face', upload.single('face'), async (req: Request, res: Response) => {
+  try {
+    if (!req.file) return res.status(400).json({ error: 'Cần gửi ảnh face' });
+
+    const uploaded = await uploadFile(req.file.buffer, 'face');
+    const [liveness, mask] = await Promise.allSettled([
+      checkFaceLiveness(uploaded.hash),
+      checkMask(uploaded.hash),
+    ]);
+
+    res.json({
+      hash: uploaded.hash,
+      liveness: liveness.status === 'fulfilled' ? liveness.value : { isReal: false },
+      mask:     mask.status     === 'fulfilled' ? mask.value     : null,
+    });
+  } catch (err) {
+    res.status(500).json({ error: err instanceof Error ? err.message : 'Unknown error' });
+  }
 });
 
-app.listen(config.port, async () => {
-  console.log(`🚀 Server running on port ${config.port}`);
-  console.log(`🌍 Environment: ${config.nodeEnv}`);
-  console.log(`☁️  Cloudinary: ${config.cloudinary.cloudName || '⚠️  CHƯA CẤU HÌNH'}`);
-  console.log(`📤 Upload endpoint: /api/upload`);
-  console.log(`🔍 Liveness endpoint: /api/liveness-result`);
-  
-  const pythonHealthy = await checkPythonServerHealth();
-  console.log(`🐍 Python Liveness Server: ${pythonHealthy ? '✅ Connected' : '⚠️  Not running (fallback mode)'}`);
+// ─── GET /api/health ──────────────────────────────────────────────────────────
+app.get('/api/health', (_req, res) => {
+  res.json({
+    status: 'ok',
+    vnpt: {
+      tokenId: process.env.VNPT_TOKEN_ID ? '✅ configured' : '❌ missing',
+      accessToken: process.env.VNPT_ACCESS_TOKEN ? '✅ configured' : '❌ missing',
+    },
+  });
+});
+
+app.listen(config.port, '0.0.0.0', () => {
+  const { networkInterfaces } = require('os');
+  const nets = networkInterfaces();
+  const lanIps: string[] = [];
+  for (const iface of Object.values(nets) as any[]) {
+    for (const addr of iface) {
+      if (addr.family === 'IPv4' && !addr.internal) lanIps.push(addr.address);
+    }
+  }
+  console.log(`🚀 Server: http://localhost:${config.port}`);
+  lanIps.forEach(ip => console.log(`📱 LAN:    http://${ip}:${config.port}`));
+  console.log(`📋 Endpoints:`);
+  console.log(`   POST /api/ekyc        → OCR + liveness + compare (front, back, face)`);
+  console.log(`   POST /api/ekyc/face   → Chỉ check liveness mặt (face)`);
+  console.log(`   GET  /api/health      → Kiểm tra cấu hình`);
 });

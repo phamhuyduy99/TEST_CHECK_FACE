@@ -1,0 +1,471 @@
+import axios, { AxiosInstance } from 'axios';
+import FormData from 'form-data';
+import sharp from 'sharp';
+
+const BASE_URL = 'https://api.idg.vnpt.vn';
+const TOKEN_ID = process.env.VNPT_TOKEN_ID!;
+const TOKEN_KEY = process.env.VNPT_TOKEN_KEY!;
+const ACCESS_TOKEN = process.env.VNPT_ACCESS_TOKEN!;
+
+// client_session format: WEB_browser_web_Device_1.0.0_<id>_<timestamp>
+const genSession = () =>
+  `WEB_browser_web_Device_1.0.0_${TOKEN_ID}_${Date.now()}`;
+
+const genToken = () => Math.random().toString(36).substring(2, 12);
+
+const client: AxiosInstance = axios.create({
+  baseURL: BASE_URL,
+  timeout: 20000,
+  headers: {
+    'Content-Type': 'application/json',
+    'Token-id': TOKEN_ID,
+    'Token-key': TOKEN_KEY,
+    'mac-address': 'TEST1',
+  },
+});
+
+// Cache client theo token để tránh tạo mới mỗi lần gọi
+const clientCache = new Map<string, AxiosInstance>();
+
+export function getClient(overrideToken?: string): AxiosInstance {
+  const token = overrideToken || ACCESS_TOKEN;
+  if (clientCache.has(token)) return clientCache.get(token)!;
+  const instance = axios.create({
+    baseURL: BASE_URL,
+    timeout: 20000,
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${token}`,
+      'Token-id': TOKEN_ID,
+      'Token-key': TOKEN_KEY,
+      'mac-address': 'TEST1',
+    },
+  });
+  clientCache.set(token, instance);
+  return instance;
+}
+
+// ─── Types ────────────────────────────────────────────────────────────────────
+
+export interface UploadResult {
+  hash: string;
+  fileName: string;
+  fileType: string;
+  uploadedDate: string;
+}
+
+export interface ClassifyResult {
+  type: number;   // 0,1=CMT cũ; 2,3=CMND mới; 5=hộ chiếu; 4=khác
+  name: string;
+}
+
+export interface CardLivenessResult {
+  liveness: 'success' | 'failure';
+  liveness_msg: string;
+  face_swapping: boolean;
+  fake_liveness: boolean;
+}
+
+export interface OcrResult {
+  msg: string;
+  id: string;
+  name: string;
+  birth_day: string;
+  gender: string;
+  nationality: string;
+  origin_location: string;
+  recent_location: string;
+  issue_date: string;
+  issue_place: string;
+  valid_date: string;
+  card_type: string;
+  type_id: number;
+  back_type_id?: number;
+  id_fake_warning: string;
+  expire_warning: string;
+  back_expire_warning?: string;
+  msg_back?: string;
+  tampering?: { is_legal: string; warning: string[] };
+}
+
+export interface FaceCompareResult {
+  result: string;
+  msg: 'MATCH' | 'NOMATCH';
+  prob: number;
+}
+
+export interface FaceLivenessResult {
+  isReal: boolean;
+  liveness: 'success' | 'failure';
+  liveness_msg: string;
+  is_eye_open: string;
+  error?: string;
+}
+
+export interface MaskResult {
+  masked: 'yes' | 'no';
+}
+
+export interface FaceAddResult {
+  result: string;
+  msg: string;
+  customer_information: CustomerInfo;
+}
+
+export interface FaceVerifyResult {
+  result: string;
+  msg: 'MATCH' | 'NOMATCH';
+  prob: number;
+  id_card: string;
+  id_type: string;
+}
+
+export interface FaceSearchResult {
+  result: string;
+  msg: string;
+  customer_information: CustomerInfo;
+  face_probability: number;
+}
+
+export interface FaceSearchKResult {
+  result: string;
+  msg: string;
+  customer_informations: Array<{ customer_information: CustomerInfo; face_probability: number }>;
+}
+
+export interface CustomerInfo {
+  card_id?: string;
+  passport_id?: string;
+  driver_license_id?: string;
+  military_id?: string;
+  police_id?: string;
+  other_id?: string;
+  fullname?: string;
+  dob?: string;
+  gender?: string;
+  address?: string;
+  hometown?: string;
+  nationality?: string;
+  ipfs?: string;
+  title?: string;
+  other_type?: string;
+  extra_info?: Record<string, string>;
+  customer_id?: string;
+}
+
+// ─── Helper ───────────────────────────────────────────────────────────────────
+
+const unwrap = <T>(data: { message: string; object: T }): T => data.object;
+
+/**
+ * Kiểu response lỗi từ VNPT API (HTTP 4xx)
+ * VNPT trả về errors[] trong response body thay vì throw exception
+ */
+interface VnptErrorResponse {
+  errors?: string[];
+  message?: string;
+  statusCode?: number;
+}
+
+/** Dùng cho các hàm không có fallback — vẫn throw để Promise.allSettled bắt được */
+const handleErr = (label: string, err: unknown): never => {
+  const e = err as { response?: { data?: VnptErrorResponse }; message?: string };
+  console.error(`❌ VNPT [${label}]:`, e?.response?.data ?? e?.message);
+  throw err;
+};
+
+// ─── 1. Upload ảnh ────────────────────────────────────────────────────────────
+
+export const uploadFile = async (
+  buffer: Buffer,
+  title = 'image',
+  description = '',
+  overrideToken?: string,
+  isUpload = false   // true = ảnh từ file upload (không re-encode)
+): Promise<UploadResult> => {
+  try {
+    let finalBuffer = buffer;
+    let contentType = 'image/jpeg';
+
+    if (isUpload) {
+      // Ảnh upload từ file: chỉ resize nếu > 5MB để tránh timeout
+      // Không re-encode JPEG → giữ nguyên chất lượng gốc, VNPT không reject
+      const meta = await sharp(buffer).metadata();
+      const w = meta.width ?? 0;
+      const h = meta.height ?? 0;
+      console.log(`📦 [${title}] upload gốc: ${buffer.length} bytes  ${w}×${h}  ${meta.format}`);
+
+      if (buffer.length > 2 * 1024 * 1024 || w > 2000 || h > 2000) {
+        // Resize về max 1600px, quality 85 — đủ cho VNPT OCR, tránh inflate
+        const resized = await sharp(buffer)
+          .rotate()
+          .resize({ width: 1600, height: 1600, fit: 'inside', withoutEnlargement: true })
+          .jpeg({ quality: 85 })
+          .toBuffer();
+        // Chỉ dùng bản resize nếu nhỏ hơn gốc
+        finalBuffer = resized.length < buffer.length ? resized : buffer;
+        console.log(`📦 [${title}] resize: ${buffer.length} → ${finalBuffer.length} bytes`);
+      } else {
+        // Chỉ auto-rotate theo EXIF, không re-encode — giữ nguyên format gốc
+        finalBuffer = await sharp(buffer).rotate().toBuffer();
+        console.log(`📦 [${title}] giữ nguyên (chỉ rotate EXIF): ${finalBuffer.length} bytes`);
+      }
+      // Lấy lại format sau khi sharp xử lý (rotate có thể giữ nguyên format)
+      contentType = meta.format === 'png' ? 'image/png' : 'image/jpeg';
+    } else {
+      // Ảnh từ camera (canvas JPEG): resize nhẹ để tối ưu upload speed
+      finalBuffer = await sharp(buffer)
+        .resize({ width: 1920, height: 1920, fit: 'inside', withoutEnlargement: true })
+        .jpeg({ quality: 92 })
+        .toBuffer();
+      console.log(`📦 [${title}] camera: ${buffer.length} → ${finalBuffer.length} bytes`);
+    }
+
+    const ext = contentType === 'image/png' ? 'png' : 'jpg';
+    const form = new FormData();
+    form.append('file', finalBuffer, { filename: `${title}.${ext}`, contentType });
+    form.append('title', title);
+    form.append('description', description);
+
+    const token = overrideToken || ACCESS_TOKEN;
+    const res = await axios.post(`${BASE_URL}/file-service/v1/addFile`, form, {
+      headers: {
+        ...form.getHeaders(),
+        Authorization: `Bearer ${token}`,
+        'Token-id': TOKEN_ID,
+        'Token-key': TOKEN_KEY,
+      },
+      timeout: 30000,
+    });
+    return unwrap<UploadResult>(res.data);
+  } catch (err) {
+    return handleErr('uploadFile', err);
+  }
+};
+
+// ─── 2. Kiểm tra loại giấy tờ ────────────────────────────────────────────────
+
+export const classifyId = async (imgHash: string): Promise<ClassifyResult> => {
+  try {
+    const res = await client.post('/ai/v1/classify/id', {
+      img_card: imgHash,
+      client_session: genSession(),
+      token: genToken(),
+    });
+    return unwrap<ClassifyResult>(res.data);
+  } catch (err) {
+    return handleErr('classifyId', err);
+  }
+};
+
+// ─── 3. Kiểm tra giấy tờ thật giả ───────────────────────────────────────────
+
+export const checkCardLiveness = async (imgHash: string, overrideToken?: string): Promise<CardLivenessResult> => {
+  try {
+    const res = await getClient(overrideToken).post('/ai/v1/card/liveness', {
+      img: imgHash,
+      client_session: genSession(),
+    });
+    return unwrap<CardLivenessResult>(res.data);
+  } catch (err) {
+    return handleErr('checkCardLiveness', err);
+  }
+};
+
+// ─── 4. OCR mặt trước ────────────────────────────────────────────────────────
+
+export const ocrFront = async (imgFrontHash: string, type = -1): Promise<OcrResult> => {
+  try {
+    const res = await client.post('/ai/v1/ocr/id/front', {
+      img_front: imgFrontHash,
+      client_session: genSession(),
+      type,
+      validate_postcode: true,
+      token: genToken(),
+    });
+    return unwrap<OcrResult>(res.data);
+  } catch (err) {
+    return handleErr('ocrFront', err);
+  }
+};
+
+// ─── 5. OCR mặt sau ──────────────────────────────────────────────────────────
+
+export const ocrBack = async (imgBackHash: string, type = -1): Promise<OcrResult> => {
+  try {
+    const res = await client.post('/ai/v1/ocr/id/back', {
+      img_back: imgBackHash,
+      client_session: genSession(),
+      type,
+      token: genToken(),
+    });
+    return unwrap<OcrResult>(res.data);
+  } catch (err) {
+    return handleErr('ocrBack', err);
+  }
+};
+
+// ─── 6. OCR cả 2 mặt ─────────────────────────────────────────────────────────
+
+export const ocrId = async (
+  imgFrontHash: string,
+  imgBackHash: string,
+  type = -1,
+  overrideToken?: string
+): Promise<OcrResult> => {
+  try {
+    const res = await getClient(overrideToken).post('/ai/v1/ocr/id', {
+      img_front: imgFrontHash,
+      img_back: imgBackHash,
+      client_session: genSession(),
+      type,
+      crop_param: '0.14,0.3',
+      validate_postcode: true,
+      token: genToken(),
+    });
+    return unwrap<OcrResult>(res.data);
+  } catch (err) {
+    return handleErr('ocrId', err);
+  }
+};
+
+// ─── 7. So sánh khuôn mặt ────────────────────────────────────────────────────
+
+export const compareFace = async (
+  imgFrontHash: string,
+  imgFaceHash: string,
+  overrideToken?: string
+): Promise<FaceCompareResult> => {
+  try {
+    const res = await getClient(overrideToken).post('/ai/v1/face/compare', {
+      img_front: imgFrontHash,
+      img_face: imgFaceHash,
+      client_session: genSession(),
+      token: genToken(),
+    });
+    return unwrap<FaceCompareResult>(res.data);
+  } catch (err) {
+    return handleErr('compareFace', err);
+  }
+};
+
+// ─── 8. Kiểm tra mặt thật (liveness) ─────────────────────────────────────────
+
+export const checkFaceLiveness = async (imgHash: string, overrideToken?: string): Promise<FaceLivenessResult> => {
+  try {
+    const res = await getClient(overrideToken).post('/ai/v1/face/liveness', {
+      img: imgHash,
+      client_session: genSession(),
+      token: genToken(),
+    });
+    const obj = unwrap<{ liveness: string; liveness_msg: string; is_eye_open: string }>(res.data);
+    return {
+      isReal: obj.liveness === 'success',
+      liveness: obj.liveness as 'success' | 'failure',
+      liveness_msg: obj.liveness_msg,
+      is_eye_open: obj.is_eye_open,
+    };
+  } catch (err) {
+    const e = err as { response?: { data?: unknown }; message?: string };
+    console.error('❌ VNPT [checkFaceLiveness]:', e?.response?.data ?? e?.message);
+    return { isReal: false, liveness: 'failure', liveness_msg: 'Lỗi kết nối', is_eye_open: 'no', error: e?.message };
+  }
+};
+
+// ─── 9. Kiểm tra che mặt ─────────────────────────────────────────────────────
+
+export const checkMask = async (
+  imgHash: string,
+  faceBbox?: string,
+  faceLmark?: string,
+  overrideToken?: string
+): Promise<MaskResult> => {
+  try {
+    const body: Record<string, unknown> = { img: imgHash, client_session: genSession() };
+    if (faceBbox) body.face_bbox = faceBbox;
+    if (faceLmark) body.face_lmark = faceLmark;
+    const res = await getClient(overrideToken).post('/ai/v1/face/mask', body);
+    return unwrap<MaskResult>(res.data);
+  } catch (err) {
+    return handleErr('checkMask', err);
+  }
+};
+
+// ─── 10. Thêm khuôn mặt vào hệ thống ─────────────────────────────────────────
+
+export const addFace = async (
+  ipfsHash: string,
+  customerInfo: CustomerInfo,
+  unit: string
+): Promise<FaceAddResult> => {
+  try {
+    const res = await client.post('/face-service/face/add', {
+      bbox: null,
+      landmark: null,
+      customer_information: { ...customerInfo, ipfs: ipfsHash },
+      unit,
+    });
+    return unwrap<FaceAddResult>(res.data);
+  } catch (err) {
+    return handleErr('addFace', err);
+  }
+};
+
+// ─── 11. Xác thực khuôn mặt ──────────────────────────────────────────────────
+
+export const verifyFace = async (
+  imgHash: string,
+  idCard: string,
+  idType: 'CARD_ID' | 'PASSPORT_ID' | 'DRIVER_LICENSE_ID' | 'MILITARY_ID' | 'POLICE_ID',
+  unit: string
+): Promise<FaceVerifyResult> => {
+  try {
+    const res = await client.post('/face-service/face/verify', {
+      img: imgHash,
+      id_card: idCard,
+      id_type: idType,
+      unit,
+    });
+    return unwrap<FaceVerifyResult>(res.data);
+  } catch (err) {
+    return handleErr('verifyFace', err);
+  }
+};
+
+// ─── 12. Tìm kiếm 1 khuôn mặt giống nhất ────────────────────────────────────
+
+export const searchFace = async (imgHash: string, unit: string): Promise<FaceSearchResult> => {
+  try {
+    const res = await client.post('/face-service/face/search', { img: imgHash, unit });
+    return unwrap<FaceSearchResult>(res.data);
+  } catch (err) {
+    return handleErr('searchFace', err);
+  }
+};
+
+// ─── 13. Tìm kiếm tập khuôn mặt gần giống nhất ───────────────────────────────
+
+export const searchFaceK = async (
+  imgHash: string,
+  unit: string,
+  k: number,
+  threshold: number
+): Promise<FaceSearchKResult> => {
+  try {
+    const res = await client.post('/face-service/face/search-k', { img: imgHash, unit, k, threshold });
+    return unwrap<FaceSearchKResult>(res.data);
+  } catch (err) {
+    return handleErr('searchFaceK', err);
+  }
+};
+
+// ─── Convenience: upload buffer rồi check liveness (dùng trong server.ts) ────
+
+export const checkLivenessVnpt = async (imageBuffer: Buffer) => {
+  try {
+    const uploaded = await uploadFile(imageBuffer, 'face');
+    return await checkFaceLiveness(uploaded.hash);
+  } catch {
+    return { isReal: false, liveness: 'failure' as const, liveness_msg: 'Lỗi VNPT', is_eye_open: 'no', error: 'upload_failed' };
+  }
+};
