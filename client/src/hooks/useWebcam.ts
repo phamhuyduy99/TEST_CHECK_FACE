@@ -1,6 +1,9 @@
 import { useRef, useState, useCallback, useEffect } from 'react';
 
-export default function useWebcam(initialFacingMode: 'user' | 'environment' = 'user', autoStart = true) {
+export default function useWebcam(
+  initialFacingMode: 'user' | 'environment' = 'user',
+  autoStart = true
+) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const [facingMode, setFacingMode] = useState<'user' | 'environment'>(initialFacingMode);
@@ -67,8 +70,10 @@ export default function useWebcam(initialFacingMode: 'user' | 'environment' = 'u
   useEffect(() => {
     // Chỉ auto-start nếu được cho phép (StepFaceCapture tắt để tự start sau user gesture)
     if (autoStart) startWithMode(initialFacingMode);
-    return () => { streamRef.current?.getTracks().forEach(t => t.stop()); };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    return () => {
+      streamRef.current?.getTracks().forEach(t => t.stop());
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   return { videoRef, active, error, facingMode, start, stop, flip, capture };

@@ -20,7 +20,7 @@ export interface EkycResult {
     id_fake_warning: string;
     expire_warning: string;
     tampering?: { is_legal: string; warning: string[] };
-    errors?: string[];   // mảng lỗi từ VNPT API
+    errors?: string[]; // mảng lỗi từ VNPT API
     error?: string;
   };
   cardLiveness?: {
@@ -61,7 +61,9 @@ export default function useEkyc() {
     setError(null);
 
     console.log(`[eKYC] 🚀 Gửi request → ${API_URL}/api/ekyc`);
-    console.log(`[eKYC] 📸 Ảnh: front=${(front.size/1024).toFixed(0)}KB  back=${(back.size/1024).toFixed(0)}KB  face=${(face.size/1024).toFixed(0)}KB`);
+    console.log(
+      `[eKYC] 📸 Ảnh: front=${(front.size / 1024).toFixed(0)}KB  back=${(back.size / 1024).toFixed(0)}KB  face=${(face.size / 1024).toFixed(0)}KB`
+    );
 
     const form = new FormData();
     form.append('front', front);
@@ -71,7 +73,7 @@ export default function useEkyc() {
     const t0 = Date.now();
     try {
       const res = await fetch(`${API_URL}/api/ekyc`, { method: 'POST', body: form });
-      console.log(`[eKYC] ⏱  Response: HTTP ${res.status} (${Date.now()-t0}ms)`);
+      console.log(`[eKYC] ⏱  Response: HTTP ${res.status} (${Date.now() - t0}ms)`);
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Lỗi server');
       console.log('[eKYC] ✅ Kết quả:', {

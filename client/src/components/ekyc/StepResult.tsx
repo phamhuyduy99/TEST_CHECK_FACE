@@ -9,7 +9,9 @@ interface Props {
 }
 
 const StatusBadge = ({ ok, label }: { ok: boolean; label: string }) => (
-  <div className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium ${ok ? 'bg-green-500/20 text-green-400 border border-green-500/30' : 'bg-red-500/20 text-red-400 border border-red-500/30'}`}>
+  <div
+    className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium ${ok ? 'bg-green-500/20 text-green-400 border border-green-500/30' : 'bg-red-500/20 text-red-400 border border-red-500/30'}`}
+  >
     <span>{ok ? '✅' : '❌'}</span>
     <span>{label}</span>
   </div>
@@ -18,7 +20,15 @@ const StatusBadge = ({ ok, label }: { ok: boolean; label: string }) => (
 const ValRow = ({ label, value, ok }: { label: string; value: string; ok?: boolean }) => (
   <div className="flex justify-between items-center py-2 border-b border-white/5 text-sm">
     <span className="text-gray-300">{label}</span>
-    <span className={ok === undefined ? 'text-white font-medium' : ok ? 'text-[#00d4a0] font-medium' : 'text-red-400 font-medium'}>
+    <span
+      className={
+        ok === undefined
+          ? 'text-white font-medium'
+          : ok
+            ? 'text-[#00d4a0] font-medium'
+            : 'text-red-400 font-medium'
+      }
+    >
       {value}
     </span>
   </div>
@@ -52,32 +62,45 @@ export default function StepResult({ result, files, onReset }: Props) {
   const backUrl = useObjectUrl(files?.back);
   const faceUrl = useObjectUrl(files?.face);
 
-  const isSuccess = faceLiveness?.isReal && cardLiveness?.liveness === 'success' && compare?.msg === 'MATCH';
+  const isSuccess =
+    faceLiveness?.isReal && cardLiveness?.liveness === 'success' && compare?.msg === 'MATCH';
   const isValid = (v?: string) => v === 'yes' || v === 'success' || v === 'OK';
 
   return (
     <div className="flex flex-col items-center min-h-screen px-4 pt-6 pb-10">
       <div className="w-full max-w-lg space-y-4">
-
         {/* Header */}
-        <div className={`rounded-2xl p-4 text-center border ${isSuccess ? 'bg-green-500/10 border-green-500/30' : 'bg-yellow-500/10 border-yellow-500/30'}`}>
+        <div
+          className={`rounded-2xl p-4 text-center border ${isSuccess ? 'bg-green-500/10 border-green-500/30' : 'bg-yellow-500/10 border-yellow-500/30'}`}
+        >
           <div className="text-3xl mb-1">{isSuccess ? '✅' : '⚠️'}</div>
-          <p className="text-white font-bold text-lg">{isSuccess ? t.verifySuccess : t.verifyDone}</p>
+          <p className="text-white font-bold text-lg">
+            {isSuccess ? t.verifySuccess : t.verifyDone}
+          </p>
         </div>
 
         {/* Status badges */}
         <div className="grid grid-cols-2 gap-2">
           {cardLiveness && !cardLiveness.error && (
-            <StatusBadge ok={cardLiveness.liveness === 'success'} label={cardLiveness.liveness === 'success' ? t.cardReal : t.cardFake} />
+            <StatusBadge
+              ok={cardLiveness.liveness === 'success'}
+              label={cardLiveness.liveness === 'success' ? t.cardReal : t.cardFake}
+            />
           )}
           {faceLiveness && !faceLiveness.error && (
             <StatusBadge ok={faceLiveness.isReal} label={faceLiveness.liveness_msg} />
           )}
           {mask && !mask.error && (
-            <StatusBadge ok={mask.masked === 'no'} label={mask.masked === 'no' ? t.noMask : t.masked} />
+            <StatusBadge
+              ok={mask.masked === 'no'}
+              label={mask.masked === 'no' ? t.noMask : t.masked}
+            />
           )}
           {compare && !compare.error && (
-            <StatusBadge ok={compare.msg === 'MATCH'} label={`${t.faceMatch} ${compare.prob?.toFixed(1)}%`} />
+            <StatusBadge
+              ok={compare.msg === 'MATCH'}
+              label={`${t.faceMatch} ${compare.prob?.toFixed(1)}%`}
+            />
           )}
         </div>
 
@@ -119,7 +142,9 @@ export default function StepResult({ result, files, onReset }: Props) {
             {compare && !compare.error && (
               <div className="flex gap-3 py-2 text-sm">
                 <span className="text-gray-400 w-32 shrink-0">{t.faceMatchScore}</span>
-                <span className={`font-bold ${compare.msg === 'MATCH' ? 'text-[#00d4a0]' : 'text-red-400'}`}>
+                <span
+                  className={`font-bold ${compare.msg === 'MATCH' ? 'text-[#00d4a0]' : 'text-red-400'}`}
+                >
                   {compare.prob?.toFixed(2)}%
                 </span>
               </div>
@@ -131,17 +156,61 @@ export default function StepResult({ result, files, onReset }: Props) {
         {tab === 'validation' && (
           <div className="bg-[#0d2535] rounded-2xl p-4">
             <ValRow label={t.valDocType} value={ocr?.card_type ?? '–'} ok={!!ocr?.card_type} />
-            <ValRow label={t.valFrontBack} value={ocr?.msg === 'OK' ? t.valHomologous : t.valInvalid} ok={ocr?.msg === 'OK'} />
-            <ValRow label={t.valBlurry} value={cardLiveness?.liveness === 'success' ? t.valNo : t.valYes} ok={cardLiveness?.liveness === 'success'} />
-            <ValRow label={t.valIdQuality} value={ocr?.msg === 'OK' ? t.valGood : t.valInvalid} ok={ocr?.msg === 'OK'} />
-            <ValRow label={t.valImgQuality} value={ocr?.msg === 'OK' ? t.valGood : t.valInvalid} ok={ocr?.msg === 'OK'} />
-            <ValRow label={t.valExpiry} value={ocr?.expire_warning ? t.valExpired : t.valNotExpired} ok={!ocr?.expire_warning} />
-            <ValRow label={t.valDirectCapture} value={faceLiveness?.isReal ? t.valValid : t.valInvalid} ok={faceLiveness?.isReal} />
-            <ValRow label={t.valWatermark} value={ocr?.tampering?.is_legal === 'yes' ? t.valValid : t.valInvalid} ok={ocr?.tampering?.is_legal === 'yes'} />
-            <ValRow label={t.valFaceSwap} value={cardLiveness?.face_swapping ? t.valYes : t.valNo} ok={!cardLiveness?.face_swapping} />
-            <ValRow label={t.valEyeOpen} value={isValid(faceLiveness?.is_eye_open) ? t.valYes : t.valNo} ok={isValid(faceLiveness?.is_eye_open)} />
-            <ValRow label={t.valMask} value={mask?.masked === 'yes' ? t.valYes : t.valNo} ok={mask?.masked !== 'yes'} />
-            <ValRow label={t.valFaceCompare} value={compare?.msg === 'MATCH' ? t.valValid : t.valInvalid} ok={compare?.msg === 'MATCH'} />
+            <ValRow
+              label={t.valFrontBack}
+              value={ocr?.msg === 'OK' ? t.valHomologous : t.valInvalid}
+              ok={ocr?.msg === 'OK'}
+            />
+            <ValRow
+              label={t.valBlurry}
+              value={cardLiveness?.liveness === 'success' ? t.valNo : t.valYes}
+              ok={cardLiveness?.liveness === 'success'}
+            />
+            <ValRow
+              label={t.valIdQuality}
+              value={ocr?.msg === 'OK' ? t.valGood : t.valInvalid}
+              ok={ocr?.msg === 'OK'}
+            />
+            <ValRow
+              label={t.valImgQuality}
+              value={ocr?.msg === 'OK' ? t.valGood : t.valInvalid}
+              ok={ocr?.msg === 'OK'}
+            />
+            <ValRow
+              label={t.valExpiry}
+              value={ocr?.expire_warning ? t.valExpired : t.valNotExpired}
+              ok={!ocr?.expire_warning}
+            />
+            <ValRow
+              label={t.valDirectCapture}
+              value={faceLiveness?.isReal ? t.valValid : t.valInvalid}
+              ok={faceLiveness?.isReal}
+            />
+            <ValRow
+              label={t.valWatermark}
+              value={ocr?.tampering?.is_legal === 'yes' ? t.valValid : t.valInvalid}
+              ok={ocr?.tampering?.is_legal === 'yes'}
+            />
+            <ValRow
+              label={t.valFaceSwap}
+              value={cardLiveness?.face_swapping ? t.valYes : t.valNo}
+              ok={!cardLiveness?.face_swapping}
+            />
+            <ValRow
+              label={t.valEyeOpen}
+              value={isValid(faceLiveness?.is_eye_open) ? t.valYes : t.valNo}
+              ok={isValid(faceLiveness?.is_eye_open)}
+            />
+            <ValRow
+              label={t.valMask}
+              value={mask?.masked === 'yes' ? t.valYes : t.valNo}
+              ok={mask?.masked !== 'yes'}
+            />
+            <ValRow
+              label={t.valFaceCompare}
+              value={compare?.msg === 'MATCH' ? t.valValid : t.valInvalid}
+              ok={compare?.msg === 'MATCH'}
+            />
           </div>
         )}
 
@@ -162,7 +231,10 @@ export default function StepResult({ result, files, onReset }: Props) {
           return (
             <div className="space-y-2">
               {allErrors.map((e, i) => (
-                <div key={i} className="flex items-start gap-2 bg-red-500/10 border border-red-500/20 rounded-lg px-3 py-2">
+                <div
+                  key={i}
+                  className="flex items-start gap-2 bg-red-500/10 border border-red-500/20 rounded-lg px-3 py-2"
+                >
                   <span className="text-red-400 text-xs font-bold shrink-0 mt-0.5">{e.label}</span>
                   <span className="text-red-300 text-xs">{e.msg}</span>
                 </div>
@@ -173,7 +245,9 @@ export default function StepResult({ result, files, onReset }: Props) {
 
         {/* Captured images */}
         <div className="space-y-3">
-          {frontUrl && <img src={frontUrl} className="w-full rounded-xl object-cover" alt="front" />}
+          {frontUrl && (
+            <img src={frontUrl} className="w-full rounded-xl object-cover" alt="front" />
+          )}
           {backUrl && <img src={backUrl} className="w-full rounded-xl object-cover" alt="back" />}
           {faceUrl && <img src={faceUrl} className="w-full rounded-xl object-cover" alt="face" />}
         </div>

@@ -22,12 +22,7 @@ export default function FaceGuideModal({ onConfirm, onClose }: Props) {
 
         {/* Video hướng dẫn */}
         <div className="rounded-xl overflow-hidden mb-4">
-          <video
-            src="/face-guide.mp4"
-            controls
-            playsInline
-            className="w-full"
-          />
+          <video src="/face-guide.mp4" controls playsInline className="w-full" />
         </div>
 
         {/* Tips */}

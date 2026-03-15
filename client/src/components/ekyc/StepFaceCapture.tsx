@@ -49,8 +49,8 @@ const GOOD_FRAMES_REQUIRED = 5;
  * - < SKIN_TOO_CLOSE → Good    (vừa khung)
  * - >= SKIN_TOO_CLOSE → TooClose (mặt quá gần, to)
  */
-const SKIN_NO_FACE   = 0.05; // dưới 5%  → chưa thấy mặt
-const SKIN_TOO_FAR   = 0.20; // 5–20%    → mặt quá xa
+const SKIN_NO_FACE = 0.05; // dưới 5%  → chưa thấy mặt
+const SKIN_TOO_FAR = 0.2; // 5–20%    → mặt quá xa
 const SKIN_TOO_CLOSE = 0.62; // trên 62% → mặt quá gần
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -64,15 +64,7 @@ function isSkinPixel(r: number, g: number, b: number): boolean {
   // |R - G| > 15, R > G, R > B
   const max = Math.max(r, g, b);
   const min = Math.min(r, g, b);
-  return (
-    r > 95 &&
-    g > 40 &&
-    b > 20 &&
-    max - min > 15 &&
-    Math.abs(r - g) > 15 &&
-    r > g &&
-    r > b
-  );
+  return r > 95 && g > 40 && b > 20 && max - min > 15 && Math.abs(r - g) > 15 && r > g && r > b;
 }
 
 /**
@@ -109,8 +101,8 @@ function analyzeFace(video: HTMLVideoElement, canvas: HTMLCanvasElement): FaceSt
 
   // Xác định vùng oval trung tâm để lấy mẫu pixel
   // Vùng lấy mẫu: 50% chiều rộng × 70% chiều cao, căn giữa
-  const sampleW = Math.floor(vw * 0.50);
-  const sampleH = Math.floor(vh * 0.70);
+  const sampleW = Math.floor(vw * 0.5);
+  const sampleH = Math.floor(vh * 0.7);
   const sampleX = Math.floor((vw - sampleW) / 2);
   const sampleY = Math.floor((vh - sampleH) / 2);
 
@@ -132,8 +124,8 @@ function analyzeFace(video: HTMLVideoElement, canvas: HTMLCanvasElement): FaceSt
   // Tỉ lệ pixel da trên tổng pixel lấy mẫu (đã chia 4 do bước 16)
   const skinRatio = (skinCount * 4) / totalPixels;
 
-  if (skinRatio < SKIN_NO_FACE)   return FaceStatus.NoFace;
-  if (skinRatio < SKIN_TOO_FAR)   return FaceStatus.TooFar;
+  if (skinRatio < SKIN_NO_FACE) return FaceStatus.NoFace;
+  if (skinRatio < SKIN_TOO_FAR) return FaceStatus.TooFar;
   if (skinRatio >= SKIN_TOO_CLOSE) return FaceStatus.TooClose;
   return FaceStatus.Good;
 }
@@ -143,7 +135,7 @@ function analyzeFace(video: HTMLVideoElement, canvas: HTMLCanvasElement): FaceSt
 // ─────────────────────────────────────────────────────────────────────────────
 interface Props {
   onNext: (file: File) => void; // callback khi chụp xong, trả về File ảnh
-  onGuide: () => void;          // mở lại FaceGuideModal
+  onGuide: () => void; // mở lại FaceGuideModal
   step?: number;
   totalSteps?: number;
 }
@@ -151,12 +143,7 @@ interface Props {
 // ─────────────────────────────────────────────────────────────────────────────
 // COMPONENT
 // ─────────────────────────────────────────────────────────────────────────────
-export default function StepFaceCapture({
-  onNext,
-  onGuide,
-  step = 3,
-  totalSteps = 4,
-}: Props) {
+export default function StepFaceCapture({ onNext, onGuide, step = 3, totalSteps = 4 }: Props) {
   // ── Webcam hook: dùng camera trước (user) cho selfie ──────────────────────
   // autoStart=false: tránh gọi camera trước user gesture → browser từ chối
   // Component này chỉ render sau khi user bấm “TÔI ĐÃ HIỂU” nên đã có gesture
@@ -164,7 +151,9 @@ export default function StepFaceCapture({
 
   // Gọi start() ngay khi mount — lúc này đã có user gesture nên browser cho phép
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  useEffect(() => { start(); }, []);
+  useEffect(() => {
+    start();
+  }, []);
 
   // ── Phase hiện tại của màn hình ───────────────────────────────────────────
   const [phase, setPhase] = useState<Phase>(Phase.Loading);
@@ -189,10 +178,10 @@ export default function StepFaceCapture({
 
   // ─── Map FaceStatus → hint config (text + màu) ─────────────────────────
   const hintConfig: Record<FaceStatus, { text: string; bg: string; color: string }> = {
-    [FaceStatus.NoFace]:   { text: t.hintNoFace,   bg: 'rgba(255,255,255,0.15)', color: '#fff' },
-    [FaceStatus.TooFar]:   { text: t.hintTooFar,   bg: 'rgba(251,191,36,0.9)',   color: '#1a1a00' },
-    [FaceStatus.TooClose]: { text: t.hintTooClose, bg: 'rgba(251,191,36,0.9)',   color: '#1a1a00' },
-    [FaceStatus.Good]:     { text: t.hintGood,     bg: '#00d4a0',                color: '#0d1f2d' },
+    [FaceStatus.NoFace]: { text: t.hintNoFace, bg: 'rgba(255,255,255,0.15)', color: '#fff' },
+    [FaceStatus.TooFar]: { text: t.hintTooFar, bg: 'rgba(251,191,36,0.9)', color: '#1a1a00' },
+    [FaceStatus.TooClose]: { text: t.hintTooClose, bg: 'rgba(251,191,36,0.9)', color: '#1a1a00' },
+    [FaceStatus.Good]: { text: t.hintGood, bg: '#00d4a0', color: '#0d1f2d' },
   };
 
   // Progress % cho Good frames (0–100) — dùng state để trigger re-render
@@ -237,7 +226,9 @@ export default function StepFaceCapture({
 
       if (status === FaceStatus.Good) {
         goodFrameCount.current += 1;
-        setGoodProgress(Math.min(100, Math.round((goodFrameCount.current / GOOD_FRAMES_REQUIRED) * 100)));
+        setGoodProgress(
+          Math.min(100, Math.round((goodFrameCount.current / GOOD_FRAMES_REQUIRED) * 100))
+        );
 
         if (goodFrameCount.current >= GOOD_FRAMES_REQUIRED) {
           clearInterval(interval);
@@ -282,23 +273,24 @@ export default function StepFaceCapture({
           - Phase.Capturing : không hiện hint (đang xử lý)
       ── */}
       <div className="h-9 flex items-center justify-center mb-4">
-        {phase === Phase.Detecting && (() => {
-          const cfg = hintConfig[faceStatus];
-          return (
-            <span
-              key={faceStatus}
-              className="text-sm font-bold px-5 py-1.5 rounded-full animate-fade-in flex items-center gap-2"
-              style={{ background: cfg.bg, color: cfg.color }}
-            >
-              {faceStatus === FaceStatus.TooFar   && '⚠️ '}
-              {faceStatus === FaceStatus.TooClose && '⚠️ '}
-              {cfg.text}
-              {faceStatus === FaceStatus.Good && goodProgress < 100 && (
-                <span className="text-xs opacity-70">{goodProgress}%</span>
-              )}
-            </span>
-          );
-        })()}
+        {phase === Phase.Detecting &&
+          (() => {
+            const cfg = hintConfig[faceStatus];
+            return (
+              <span
+                key={faceStatus}
+                className="text-sm font-bold px-5 py-1.5 rounded-full animate-fade-in flex items-center gap-2"
+                style={{ background: cfg.bg, color: cfg.color }}
+              >
+                {faceStatus === FaceStatus.TooFar && '⚠️ '}
+                {faceStatus === FaceStatus.TooClose && '⚠️ '}
+                {cfg.text}
+                {faceStatus === FaceStatus.Good && goodProgress < 100 && (
+                  <span className="text-xs opacity-70">{goodProgress}%</span>
+                )}
+              </span>
+            );
+          })()}
       </div>
 
       {/* ── Vùng oval camera ── */}
@@ -315,7 +307,10 @@ export default function StepFaceCapture({
         >
           {/* Viền oval nền (luôn hiện, màu thay đổi theo phase) */}
           <ellipse
-            cx="130" cy="170" rx="115" ry="150"
+            cx="130"
+            cy="170"
+            rx="115"
+            ry="150"
             stroke={
               phase === Phase.Capturing
                 ? '#00d4a0'
@@ -335,7 +330,10 @@ export default function StepFaceCapture({
             <>
               {/* Arc chính quay */}
               <ellipse
-                cx="130" cy="170" rx="115" ry="150"
+                cx="130"
+                cy="170"
+                rx="115"
+                ry="150"
                 stroke="#00d4a0"
                 strokeWidth="3"
                 fill="none"
@@ -348,7 +346,10 @@ export default function StepFaceCapture({
               />
               {/* Arc phụ ngược chiều (tạo hiệu ứng đẹp hơn) */}
               <ellipse
-                cx="130" cy="170" rx="115" ry="150"
+                cx="130"
+                cy="170"
+                rx="115"
+                ry="150"
                 stroke="rgba(0,212,160,0.3)"
                 strokeWidth="2"
                 fill="none"
@@ -369,7 +370,7 @@ export default function StepFaceCapture({
           style={{
             width: 224,
             height: 294,
-            borderRadius: '50%', /* tạo hình oval */
+            borderRadius: '50%' /* tạo hình oval */,
           }}
         >
           {/* Loading placeholder: hiện khi camera chưa sẵn sàng */}
@@ -380,7 +381,14 @@ export default function StepFaceCapture({
             >
               {/* Spinner nhỏ ở giữa khi đang tải camera */}
               <svg className="animate-spin w-8 h-8 text-[#00d4a0]" viewBox="0 0 24 24" fill="none">
-                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                <circle
+                  className="opacity-25"
+                  cx="12"
+                  cy="12"
+                  r="10"
+                  stroke="currentColor"
+                  strokeWidth="4"
+                />
                 <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
               </svg>
             </div>
@@ -395,7 +403,7 @@ export default function StepFaceCapture({
             className="w-full h-full object-cover"
             style={{
               display: active ? 'block' : 'none',
-              transform: 'scaleX(-1)', /* mirror camera trước */
+              transform: 'scaleX(-1)' /* mirror camera trước */,
             }}
           />
         </div>

@@ -126,7 +126,8 @@ const en: typeof vi = {
   guide: 'Guide',
   tipRetake: "Choose 'Retake' if the image is blurry or unclear",
   tipNext: "Choose 'Next' to proceed to the next step",
-  tipPlace: 'Please place the document within the rectangular frame, with good lighting and clarity',
+  tipPlace:
+    'Please place the document within the rectangular frame, with good lighting and clarity',
   stepLabel: 'Step',
   verifySuccess: 'Verification Successful',
   verifyDone: 'Verification Complete',

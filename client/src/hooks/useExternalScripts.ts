@@ -71,8 +71,9 @@ export function useExternalScripts() {
 
   const allReady = SCRIPTS.every(src => states.get(src) === 'ready');
   const hasError = SCRIPTS.some(src => states.get(src) === 'error');
-  const failedScripts = SCRIPTS.filter(src => states.get(src) === 'error')
-    .map(src => src.split('/').pop() ?? src);
+  const failedScripts = SCRIPTS.filter(src => states.get(src) === 'error').map(
+    src => src.split('/').pop() ?? src
+  );
 
   return { allReady, hasError, failedScripts, states };
 }
