@@ -1,58 +1,22 @@
+import { useT } from '../../i18n';
+
 interface Props {
   onSelect: (type: number, label: string) => void;
 }
 
-const DOC_TYPES = [
-  {
-    type: -1,
-    label: 'Chứng minh thư, Thẻ căn cước',
-    icon: (
-      <svg viewBox="0 0 24 24" fill="none" className="w-7 h-7 text-white" stroke="currentColor" strokeWidth={1.5}>
-        <rect x="2" y="5" width="20" height="14" rx="2" />
-        <circle cx="8" cy="11" r="2.5" />
-        <path strokeLinecap="round" d="M13 10h4M13 13h3" />
-      </svg>
-    ),
-  },
-  {
-    type: 5,
-    label: 'Hộ chiếu',
-    icon: (
-      <svg viewBox="0 0 24 24" fill="none" className="w-7 h-7 text-white" stroke="currentColor" strokeWidth={1.5}>
-        <rect x="4" y="2" width="16" height="20" rx="2" />
-        <circle cx="12" cy="10" r="3" />
-        <path strokeLinecap="round" d="M7 17h10M7 14h10" />
-      </svg>
-    ),
-  },
-  {
-    type: 6,
-    label: 'Bằng lái xe',
-    icon: (
-      <svg viewBox="0 0 24 24" fill="none" className="w-7 h-7 text-white" stroke="currentColor" strokeWidth={1.5}>
-        <rect x="2" y="5" width="20" height="14" rx="2" />
-        <circle cx="7" cy="12" r="2" />
-        <path strokeLinecap="round" d="M12 9h6M12 12h5M12 15h4" />
-      </svg>
-    ),
-  },
-  {
-    type: 99,
-    label: 'Giấy tờ khác',
-    icon: (
-      <svg viewBox="0 0 24 24" fill="none" className="w-7 h-7 text-white" stroke="currentColor" strokeWidth={1.5}>
-        <path strokeLinecap="round" d="M9 2H5a2 2 0 00-2 2v16a2 2 0 002 2h14a2 2 0 002-2V9l-7-7zM9 2v7h7" />
-        <path strokeLinecap="round" d="M8 13h8M8 17h5" />
-      </svg>
-    ),
-  },
-];
-
 export default function StepSelectDoc({ onSelect }: Props) {
+  const { t } = useT();
+
+  const DOC_TYPES = [
+    { type: -1, label: t.doc0, icon: (<svg viewBox="0 0 24 24" fill="none" className="w-7 h-7 text-white" stroke="currentColor" strokeWidth={1.5}><rect x="2" y="5" width="20" height="14" rx="2" /><circle cx="8" cy="11" r="2.5" /><path strokeLinecap="round" d="M13 10h4M13 13h3" /></svg>) },
+    { type: 5,  label: t.doc1, icon: (<svg viewBox="0 0 24 24" fill="none" className="w-7 h-7 text-white" stroke="currentColor" strokeWidth={1.5}><rect x="4" y="2" width="16" height="20" rx="2" /><circle cx="12" cy="10" r="3" /><path strokeLinecap="round" d="M7 17h10M7 14h10" /></svg>) },
+    { type: 6,  label: t.doc2, icon: (<svg viewBox="0 0 24 24" fill="none" className="w-7 h-7 text-white" stroke="currentColor" strokeWidth={1.5}><rect x="2" y="5" width="20" height="14" rx="2" /><circle cx="7" cy="12" r="2" /><path strokeLinecap="round" d="M12 9h6M12 12h5M12 15h4" /></svg>) },
+    { type: 99, label: t.doc3, icon: (<svg viewBox="0 0 24 24" fill="none" className="w-7 h-7 text-white" stroke="currentColor" strokeWidth={1.5}><path strokeLinecap="round" d="M9 2H5a2 2 0 00-2 2v16a2 2 0 002 2h14a2 2 0 002-2V9l-7-7zM9 2v7h7" /><path strokeLinecap="round" d="M8 13h8M8 17h5" /></svg>) },
+  ];
   return (
     <div className="flex flex-col items-center justify-center min-h-screen px-4">
-      <h1 className="text-xl font-bold text-white mb-1">Xác thực giấy tờ</h1>
-      <p className="text-sm text-gray-400 mb-10">Chọn giấy tờ bạn muốn xác thực</p>
+      <h1 className="text-xl font-bold text-white mb-1">{t.selectTitle}</h1>
+      <p className="text-sm text-gray-400 mb-10">{t.selectSub}</p>
 
       <div className="w-full max-w-md space-y-3">
         {DOC_TYPES.map((doc) => (

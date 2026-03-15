@@ -1,9 +1,12 @@
 import { useState } from 'react';
 import StepSelectDoc from '../components/ekyc/StepSelectDoc';
 import GuideModal from '../components/ekyc/GuideModal';
+import FaceGuideModal from '../components/ekyc/FaceGuideModal';
 import StepCapture from '../components/ekyc/StepCapture';
+import StepFaceCapture from '../components/ekyc/StepFaceCapture';
 import StepResult from '../components/ekyc/StepResult';
 import useEkyc from '../hooks/useEkyc';
+import { useT } from '../i18n';
 
 type Screen = 'select' | 'guide' | 'front' | 'back' | 'face' | 'processing' | 'result';
 
@@ -12,8 +15,11 @@ export default function EkycFlowPage() {
   const [_docType, setDocType] = useState(-1);
   const [docLabel, setDocLabel] = useState('');
   const [showGuide, setShowGuide] = useState(false);
+  const [showFaceGuide, setShowFaceGuide] = useState(false);
+  const [faceReady, setFaceReady] = useState(false);
   const [files, setFiles] = useState<{ front?: File; back?: File; face?: File }>({});
-  const { result, runEkyc, setResult } = useEkyc();
+  const { result, error, runEkyc, setResult } = useEkyc();
+  const { lang, setLang, t } = useT();
 
   const handleSelectDoc = (type: number, label: string) => {
     setDocType(type);
@@ -33,6 +39,8 @@ export default function EkycFlowPage() {
 
   const handleBack = (file: File) => {
     setFiles(p => ({ ...p, back: file }));
+    setShowFaceGuide(true);
+    setFaceReady(false);
     setScreen('face');
   };
 
@@ -44,11 +52,18 @@ export default function EkycFlowPage() {
     setScreen('result');
   };
 
+  const handleRetryFromError = () => {
+    setScreen('face');
+    setResult(null);
+  };
+
   const handleReset = () => {
     setScreen('select');
     setFiles({});
     setResult(null);
     setShowGuide(false);
+    setShowFaceGuide(false);
+    setFaceReady(false);
   };
 
 
@@ -67,11 +82,23 @@ export default function EkycFlowPage() {
       />
 
       {/* Language selector */}
-      <div className="absolute top-4 right-4 z-10">
-        <select className="bg-white text-gray-800 text-sm font-medium px-3 py-1.5 rounded-lg border border-gray-200 cursor-pointer">
-          <option>Vietnam</option>
-          <option>English</option>
-        </select>
+      <div className="absolute top-4 right-4 z-20 flex rounded-lg overflow-hidden border border-white/20">
+        <button
+          onClick={() => setLang('vi')}
+          className={`px-3 py-2 text-sm font-medium transition ${
+            lang === 'vi' ? 'bg-[#00d4a0] text-[#0d1f2d]' : 'bg-white/10 text-white'
+          }`}
+        >
+          VI
+        </button>
+        <button
+          onClick={() => setLang('en')}
+          className={`px-3 py-2 text-sm font-medium transition ${
+            lang === 'en' ? 'bg-[#00d4a0] text-[#0d1f2d]' : 'bg-white/10 text-white'
+          }`}
+        >
+          EN
+        </button>
       </div>
 
       {/* Content */}
@@ -82,7 +109,7 @@ export default function EkycFlowPage() {
 
         {screen === 'front' && (
           <StepCapture
-            title="Chụp mặt trước"
+            title={t.captureFront}
             step={1}
             onNext={handleFront}
             onGuide={() => setShowGuide(true)}
@@ -92,7 +119,7 @@ export default function EkycFlowPage() {
 
         {screen === 'back' && (
           <StepCapture
-            title="Chụp mặt sau"
+            title={t.captureBack}
             step={2}
             onNext={handleBack}
             onGuide={() => setShowGuide(true)}
@@ -100,12 +127,12 @@ export default function EkycFlowPage() {
           />
         )}
 
-        {screen === 'face' && (
-          <StepCapture
-            title="Chụp khuôn mặt"
-            step={3}
+        {screen === 'face' && faceReady && (
+          <StepFaceCapture
             onNext={handleFace}
-            facingMode="user"
+            onGuide={() => setShowFaceGuide(true)}
+            step={3}
+            totalSteps={4}
           />
         )}
 
@@ -115,17 +142,54 @@ export default function EkycFlowPage() {
               <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
               <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
             </svg>
-            <p className="text-white font-semibold text-lg">Đang xử lý...</p>
-            <p className="text-gray-400 text-sm">VNPT AI đang phân tích giấy tờ của bạn</p>
+            <p className="text-white font-semibold text-lg">{t.processing}</p>
+            <p className="text-gray-400 text-sm">{t.processingDesc}</p>
           </div>
         )}
 
         {screen === 'result' && result && (
-          <StepResult result={result} onReset={handleReset} />
+          <StepResult result={result} files={files} onReset={handleReset} />
+        )}
+
+        {screen === 'result' && !result && (
+          <div className="flex flex-col items-center justify-center min-h-screen gap-6 px-4">
+            <div className="w-16 h-16 rounded-full bg-red-500/20 flex items-center justify-center">
+              <svg className="w-8 h-8 text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
+              </svg>
+            </div>
+            <div className="text-center">
+              <p className="text-white font-semibold text-xl mb-2">{t.errorTitle}</p>
+              <p className="text-red-400 text-sm max-w-sm">{error || t.errorDefault}</p>
+            </div>
+            <div className="flex gap-3">
+              <button
+                onClick={handleRetryFromError}
+                className="px-6 py-2.5 rounded-lg font-semibold text-sm"
+                style={{ background: '#00d4a0', color: '#0d1f2d' }}
+              >
+                {t.retry}
+              </button>
+              <button
+                onClick={handleReset}
+                className="px-6 py-2.5 rounded-lg font-semibold text-sm border border-white/30 text-white"
+              >
+                {t.home}
+              </button>
+            </div>
+          </div>
         )}
       </div>
 
-      {/* Guide modal */}
+        {/* Face guide modal */}
+        {showFaceGuide && (
+          <FaceGuideModal
+            onConfirm={() => { setShowFaceGuide(false); setFaceReady(true); }}
+            onClose={() => { setShowFaceGuide(false); setScreen('back'); }}
+          />
+        )}
+
+        {/* Guide modal */}
       {showGuide && (
         <GuideModal
           docLabel={docLabel}

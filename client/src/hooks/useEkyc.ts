@@ -1,6 +1,7 @@
 import { useState } from 'react';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+const API_URL = import.meta.env.VITE_API_URL || '';
+console.log(`[eKYC] API_URL = ${API_URL}`);
 
 export interface EkycResult {
   ocr?: {
@@ -19,6 +20,7 @@ export interface EkycResult {
     id_fake_warning: string;
     expire_warning: string;
     tampering?: { is_legal: string; warning: string[] };
+    errors?: string[];   // mảng lỗi từ VNPT API
     error?: string;
   };
   cardLiveness?: {
@@ -26,6 +28,7 @@ export interface EkycResult {
     liveness_msg: string;
     face_swapping: boolean;
     fake_liveness: boolean;
+    errors?: string[];
     error?: string;
   };
   faceLiveness?: {
@@ -33,13 +36,15 @@ export interface EkycResult {
     liveness: 'success' | 'failure';
     liveness_msg: string;
     is_eye_open: string;
+    errors?: string[];
     error?: string;
   };
-  mask?: { masked: 'yes' | 'no'; error?: string };
+  mask?: { masked: 'yes' | 'no'; errors?: string[]; error?: string };
   compare?: {
     result: string;
     msg: 'MATCH' | 'NOMATCH';
     prob: number;
+    errors?: string[];
     error?: string;
   };
   hashes?: { front: string; back: string; face: string };
@@ -55,17 +60,30 @@ export default function useEkyc() {
     setResult(null);
     setError(null);
 
+    console.log(`[eKYC] 🚀 Gửi request → ${API_URL}/api/ekyc`);
+    console.log(`[eKYC] 📸 Ảnh: front=${(front.size/1024).toFixed(0)}KB  back=${(back.size/1024).toFixed(0)}KB  face=${(face.size/1024).toFixed(0)}KB`);
+
     const form = new FormData();
     form.append('front', front);
     form.append('back', back);
     form.append('face', face);
 
+    const t0 = Date.now();
     try {
       const res = await fetch(`${API_URL}/api/ekyc`, { method: 'POST', body: form });
+      console.log(`[eKYC] ⏱  Response: HTTP ${res.status} (${Date.now()-t0}ms)`);
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Lỗi server');
+      console.log('[eKYC] ✅ Kết quả:', {
+        ocr: data.ocr?.msg,
+        cardLiveness: data.cardLiveness?.liveness,
+        faceLiveness: data.faceLiveness?.liveness,
+        mask: data.mask?.masked,
+        compare: data.compare?.msg,
+      });
       setResult(data);
     } catch (err) {
+      console.error('[eKYC] ❌ Lỗi:', err);
       setError(err instanceof Error ? err.message : 'Lỗi không xác định');
     } finally {
       setLoading(false);

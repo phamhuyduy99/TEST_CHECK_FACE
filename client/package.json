@@ -14,13 +14,7 @@
     "type-check": "tsc --noEmit"
   },
   "dependencies": {
-    "@mediapipe/camera_utils": "^0.3.1675466862",
-    "@mediapipe/face_detection": "^0.4.1646425229",
-    "@tensorflow-models/face-landmarks-detection": "^1.0.6",
-    "@tensorflow/tfjs": "^4.22.0",
-    "face-api.js": "^0.22.2",
-    "faceplugin-face-recognition-js": "^0.0.1",
-    "mobile-detect": "^1.4.5",
+    "heic2any": "^0.0.4",
     "react": "^19.2.0",
     "react-dom": "^19.2.0"
   },
@@ -40,12 +34,9 @@
     "globals": "^16.5.0",
     "postcss": "^8.5.8",
     "prettier": "^3.8.1",
-    "rollup-plugin-visualizer": "^7.0.1",
     "tailwindcss": "^4.2.1",
-    "terser": "^5.46.0",
     "typescript": "^5.9.3",
     "typescript-eslint": "^8.56.1",
-    "vite": "^7.3.1",
-    "vite-plugin-checker": "^0.12.0"
+    "vite": "^7.3.1"
   }
 }

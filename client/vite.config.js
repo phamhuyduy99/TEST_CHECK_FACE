@@ -1,58 +1,40 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
-import checker from 'vite-plugin-checker';
-import { visualizer } from 'rollup-plugin-visualizer';
 import basicSsl from '@vitejs/plugin-basic-ssl';
 
-// https://vite.dev/config/
 export default defineConfig({
-  plugins: [
-    react(),
-    basicSsl(),
-    checker({
-      typescript: true,
-      overlay: {
-        initialIsOpen: true,
-      },
-    }),
-    visualizer({
-      filename: './dist/stats.html',
-      open: false,
-      gzipSize: true,
-    }),
-  ],
+  plugins: [react(), basicSsl()],
   server: {
     port: 5173,
     host: true,
-    open: true,
     hmr: true,
-    headers: {
-      'Cross-Origin-Embedder-Policy': 'require-corp',
-      'Cross-Origin-Opener-Policy': 'same-origin',
+    proxy: {
+      '/api': {
+        target: 'http://localhost:3000',
+        changeOrigin: true,
+      },
     },
   },
-  optimizeDeps: {
-    exclude: ['faceplugin-face-recognition-js'],
-    include: ['ndarray', 'ndarray-ops'],
+  preview: {
+    port: 5173,
+    host: true,
+    https: true,
+    proxy: {
+      '/api': {
+        target: 'http://localhost:3000',
+        changeOrigin: true,
+      },
+    },
   },
-  assetsInclude: ['**/*.wasm'],
   build: {
     rollupOptions: {
       output: {
         manualChunks: {
-          'react-vendor': ['react', 'react-dom'],
-          'face-api': ['face-api.js'],
+           'react-vendor': ['react', 'react-dom'],
         },
       },
     },
     chunkSizeWarningLimit: 1000,
     sourcemap: false,
-    minify: 'terser',
-    terserOptions: {
-      compress: {
-        drop_console: true,
-        drop_debugger: true,
-      },
-    },
   },
 });

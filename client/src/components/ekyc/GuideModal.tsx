@@ -1,3 +1,5 @@
+import { useT } from '../../i18n';
+
 interface Props {
   docLabel: string;
   onStart: () => void;
@@ -5,6 +7,7 @@ interface Props {
 }
 
 export default function GuideModal({ docLabel, onStart, onClose }: Props) {
+  const { t } = useT();
   return (
     <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 px-4">
       <div className="bg-white rounded-2xl w-full max-w-lg p-6 relative">
@@ -17,7 +20,7 @@ export default function GuideModal({ docLabel, onStart, onClose }: Props) {
         </button>
 
         <h2 className="text-center font-bold text-gray-800 text-lg mb-5">
-          Hướng dẫn chụp ảnh {docLabel}
+          {t.guideTitle} {docLabel}
         </h2>
 
         {/* Steps */}
@@ -33,7 +36,7 @@ export default function GuideModal({ docLabel, onStart, onClose }: Props) {
                 <rect x="34" y="25" width="32" height="3" rx="2" fill="#b2dfdb"/>
               </svg>
             </div>
-            <span className="text-xs text-gray-500">Bước 1: Chụp mặt trước</span>
+            <span className="text-xs text-gray-500">{t.step1}</span>
           </div>
           <div className="flex flex-col items-center gap-2">
             <div className="w-28 h-20 border-2 border-[#00d4a0] rounded-lg flex items-center justify-center bg-gray-50">
@@ -45,19 +48,19 @@ export default function GuideModal({ docLabel, onStart, onClose }: Props) {
                 <path d="M52 20 Q58 14 64 20 Q58 26 52 20Z" fill="#80cbc4"/>
               </svg>
             </div>
-            <span className="text-xs text-gray-500">Bước 2: Chụp mặt sau</span>
+            <span className="text-xs text-gray-500">{t.step2}</span>
           </div>
         </div>
 
         {/* Tips */}
         <ul className="text-sm text-gray-600 space-y-1 mb-5 list-disc list-inside">
-          <li>Đưa giấy tờ vào gần camera sao cho 4 góc của giấy tờ trùng với vùng giới hạn</li>
-          <li>Chụp rõ nét và đầy đủ thông tin trên giấy tờ</li>
+          <li>{t.tip1}</li>
+          <li>{t.tip2}</li>
         </ul>
 
         {/* Don'ts */}
         <div className="flex justify-center gap-6 mb-6">
-          {['Không chụp quá mờ', 'Không chụp mất góc', 'Không chụp lóa sáng'].map((tip) => (
+          {[t.dont1, t.dont2, t.dont3].map((tip) => (
             <div key={tip} className="flex flex-col items-center gap-1">
               <div className="w-16 h-12 bg-gray-100 rounded-lg flex items-center justify-center relative">
                 <svg viewBox="0 0 60 40" className="w-14 h-10 opacity-50">
@@ -79,7 +82,7 @@ export default function GuideModal({ docLabel, onStart, onClose }: Props) {
           onClick={onStart}
           className="w-full py-3 rounded-xl bg-[#00d4a0] hover:bg-[#00bf8f] text-white font-bold text-sm tracking-widest transition"
         >
-          BẮT ĐẦU
+          {t.start}
         </button>
       </div>
     </div>

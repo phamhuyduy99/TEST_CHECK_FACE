@@ -33,6 +33,9 @@ app.post(
     { name: 'face', maxCount: 1 },
   ]),
   async (req: Request, res: Response) => {
+    const reqId = Math.random().toString(36).slice(2, 8).toUpperCase();
+    const t0 = Date.now();
+    console.log(`\n[${reqId}] ▶ POST /api/ekyc`);
     try {
       const files = req.files as Record<string, Express.Multer.File[]>;
 
@@ -40,14 +43,21 @@ app.post(
         return res.status(400).json({ error: 'Cần gửi đủ 3 ảnh: front, back, face' });
       }
 
-      console.log('📤 Uploading 3 ảnh lên VNPT...');
+      console.log(`[${reqId}] 📸 Ảnh nhận được:`);
+      console.log(`[${reqId}]    front: ${(files.front[0].size/1024).toFixed(0)}KB  ${files.front[0].mimetype}`);
+      console.log(`[${reqId}]    back:  ${(files.back[0].size/1024).toFixed(0)}KB  ${files.back[0].mimetype}`);
+      console.log(`[${reqId}]    face:  ${(files.face[0].size/1024).toFixed(0)}KB  ${files.face[0].mimetype}`);
+
+      console.log(`[${reqId}] 📤 Uploading 3 ảnh lên VNPT...`);
       const [frontUpload, backUpload, faceUpload] = await Promise.all([
         uploadFile(files.front[0].buffer, 'front', 'Mặt trước giấy tờ'),
         uploadFile(files.back[0].buffer, 'back', 'Mặt sau giấy tờ'),
         uploadFile(files.face[0].buffer, 'face', 'Ảnh chân dung'),
       ]);
+      console.log(`[${reqId}] ✅ Upload xong (${Date.now()-t0}ms)`);
 
-      console.log('🔍 Gọi các API VNPT song song...');
+      console.log(`[${reqId}] 🔍 Gọi 5 API VNPT song song...`);
+      const t1 = Date.now();
       const [ocr, cardLiveness, faceLiveness, mask, compare] = await Promise.allSettled([
         ocrId(frontUpload.hash, backUpload.hash),
         checkCardLiveness(frontUpload.hash),
@@ -55,13 +65,30 @@ app.post(
         checkMask(faceUpload.hash),
         compareFace(frontUpload.hash, faceUpload.hash),
       ]);
+      console.log(`[${reqId}] ⏱  VNPT APIs: ${Date.now()-t1}ms`);
+      console.log(`[${reqId}]    ocr:          ${ocr.status}          ${ ocr.status==='fulfilled' ? ocr.value.msg : (ocr as PromiseRejectedResult).reason?.response?.data?.errors?.[0] ?? 'err'}`);
+      console.log(`[${reqId}]    cardLiveness: ${cardLiveness.status} ${ cardLiveness.status==='fulfilled' ? cardLiveness.value.liveness : (cardLiveness as PromiseRejectedResult).reason?.response?.data?.errors?.[0] ?? 'err'}`);
+      console.log(`[${reqId}]    faceLiveness: ${faceLiveness.status} ${ faceLiveness.status==='fulfilled' ? faceLiveness.value.liveness : 'err'}`);
+      console.log(`[${reqId}]    mask:         ${mask.status}         ${ mask.status==='fulfilled' ? mask.value.masked : (mask as PromiseRejectedResult).reason?.response?.data?.errors?.[0] ?? 'err'}`);
+      console.log(`[${reqId}]    compare:      ${compare.status}      ${ compare.status==='fulfilled' ? `${compare.value.msg} ${compare.value.prob?.toFixed(1)}%` : (compare as PromiseRejectedResult).reason?.response?.data?.errors?.[0] ?? 'err'}`);
+
+      // Helper: extract errors[] từ axios rejected reason
+      // VNPT trả về errors[] trong response.data khi HTTP 4xx
+      const extractErr = (reason: unknown) => {
+        const r = reason as { response?: { data?: { errors?: string[]; message?: string } }; message?: string };
+        const data = r?.response?.data;
+        const errors: string[] = data?.errors?.length
+          ? data.errors
+          : [data?.message ?? r?.message ?? 'Lỗi không xác định'];
+        return { errors, error: errors[0] };
+      };
 
       const result = {
-        ocr:          ocr.status          === 'fulfilled' ? ocr.value          : { error: (ocr as PromiseRejectedResult).reason?.message },
-        cardLiveness: cardLiveness.status === 'fulfilled' ? cardLiveness.value : { error: (cardLiveness as PromiseRejectedResult).reason?.message },
-        faceLiveness: faceLiveness.status === 'fulfilled' ? faceLiveness.value : { isReal: false, error: (faceLiveness as PromiseRejectedResult).reason?.message },
-        mask:         mask.status         === 'fulfilled' ? mask.value         : { error: (mask as PromiseRejectedResult).reason?.message },
-        compare:      compare.status      === 'fulfilled' ? compare.value      : { error: (compare as PromiseRejectedResult).reason?.message },
+        ocr:          ocr.status          === 'fulfilled' ? ocr.value          : extractErr((ocr as PromiseRejectedResult).reason),
+        cardLiveness: cardLiveness.status === 'fulfilled' ? cardLiveness.value : extractErr((cardLiveness as PromiseRejectedResult).reason),
+        faceLiveness: faceLiveness.status === 'fulfilled' ? faceLiveness.value : { isReal: false, ...extractErr((faceLiveness as PromiseRejectedResult).reason) },
+        mask:         mask.status         === 'fulfilled' ? mask.value         : extractErr((mask as PromiseRejectedResult).reason),
+        compare:      compare.status      === 'fulfilled' ? compare.value      : extractErr((compare as PromiseRejectedResult).reason),
         hashes: {
           front: frontUpload.hash,
           back:  backUpload.hash,
@@ -69,11 +96,11 @@ app.post(
         },
       };
 
-      console.log('✅ eKYC hoàn tất');
+      console.log(`[${reqId}] ✅ eKYC hoàn tất — tổng ${Date.now()-t0}ms`);
       res.json(result);
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Unknown error';
-      console.error('❌ eKYC error:', msg);
+      console.error(`❌ eKYC error:`, msg);
       res.status(500).json({ error: msg });
     }
   }
@@ -112,8 +139,17 @@ app.get('/api/health', (_req, res) => {
   });
 });
 
-app.listen(config.port, () => {
+app.listen(config.port, '0.0.0.0', () => {
+  const { networkInterfaces } = require('os');
+  const nets = networkInterfaces();
+  const lanIps: string[] = [];
+  for (const iface of Object.values(nets) as any[]) {
+    for (const addr of iface) {
+      if (addr.family === 'IPv4' && !addr.internal) lanIps.push(addr.address);
+    }
+  }
   console.log(`🚀 Server: http://localhost:${config.port}`);
+  lanIps.forEach(ip => console.log(`📱 LAN:    http://${ip}:${config.port}`));
   console.log(`📋 Endpoints:`);
   console.log(`   POST /api/ekyc        → OCR + liveness + compare (front, back, face)`);
   console.log(`   POST /api/ekyc/face   → Chỉ check liveness mặt (face)`);

@@ -1,5 +1,6 @@
 import axios, { AxiosInstance } from 'axios';
 import FormData from 'form-data';
+import sharp from 'sharp';
 
 const BASE_URL = 'https://api.idg.vnpt.vn';
 const TOKEN_ID = process.env.VNPT_TOKEN_ID!;
@@ -136,8 +137,37 @@ export interface CustomerInfo {
 
 const unwrap = <T>(data: { message: string; object: T }): T => data.object;
 
-const handleErr = (label: string, err: unknown) => {
-  const e = err as { response?: { data?: unknown }; message?: string };
+/**
+ * Kiểu response lỗi từ VNPT API (HTTP 4xx)
+ * VNPT trả về errors[] trong response body thay vì throw exception
+ */
+interface VnptErrorResponse {
+  errors?: string[];
+  message?: string;
+  statusCode?: number;
+}
+
+/**
+ * Extract errors[] từ axios error response của VNPT.
+ * Thay vì throw raw axios error ("Request failed with status code 400"),
+ * trả về object có errors[] để frontend hiển thị đúng thông báo.
+ */
+const extractVnptError = (label: string, err: unknown): { errors: string[]; error: string } => {
+  const e = err as { response?: { data?: VnptErrorResponse }; message?: string };
+  const data = e?.response?.data;
+  console.error(`❌ VNPT [${label}]:`, data ?? e?.message);
+
+  // Lấy errors[] từ response body nếu có, fallback về message
+  const errors: string[] = data?.errors?.length
+    ? data.errors
+    : [data?.message ?? e?.message ?? 'Lỗi không xác định'];
+
+  return { errors, error: errors[0] };
+};
+
+/** Dùng cho các hàm không có fallback — vẫn throw để Promise.allSettled bắt được */
+const handleErr = (label: string, err: unknown): never => {
+  const e = err as { response?: { data?: VnptErrorResponse }; message?: string };
   console.error(`❌ VNPT [${label}]:`, e?.response?.data ?? e?.message);
   throw err;
 };
@@ -150,8 +180,16 @@ export const uploadFile = async (
   description = ''
 ): Promise<UploadResult> => {
   try {
+    // Compress: resize max 1600px, jpeg quality 92 — giữ đủ chi tiết chữ cho OCR
+    const compressed = await sharp(buffer)
+      .resize({ width: 1600, height: 1600, fit: 'inside', withoutEnlargement: true })
+      .jpeg({ quality: 92 })
+      .toBuffer();
+
+    console.log(`📦 [${title}] ${buffer.length} → ${compressed.length} bytes`);
+
     const form = new FormData();
-    form.append('file', buffer, { filename: `${title}.jpg`, contentType: 'image/jpeg' });
+    form.append('file', compressed, { filename: `${title}.jpg`, contentType: 'image/jpeg' });
     form.append('title', title);
     form.append('description', description);
 
@@ -305,12 +343,10 @@ export const checkMask = async (
   faceLmark?: string
 ): Promise<MaskResult> => {
   try {
-    const res = await client.post('/ai/v1/face/mask', {
-      img: imgHash,
-      face_bbox: faceBbox ?? '',
-      face_lmark: faceLmark ?? '',
-      client_session: genSession(),
-    });
+    const body: Record<string, unknown> = { img: imgHash, client_session: genSession() };
+    if (faceBbox) body.face_bbox = faceBbox;
+    if (faceLmark) body.face_lmark = faceLmark;
+    const res = await client.post('/ai/v1/face/mask', body);
     return unwrap<MaskResult>(res.data);
   } catch (err) {
     return handleErr('checkMask', err);
