@@ -1,11 +1,11 @@
 import axios, { AxiosInstance } from 'axios';
 import FormData from 'form-data';
 import sharp from 'sharp';
+import { getAccessToken } from './tokenService';
 
 const BASE_URL = 'https://api.idg.vnpt.vn';
 const TOKEN_ID = process.env.VNPT_TOKEN_ID!;
 const TOKEN_KEY = process.env.VNPT_TOKEN_KEY!;
-const ACCESS_TOKEN = process.env.VNPT_ACCESS_TOKEN!;
 
 // client_session format: WEB_browser_web_Device_1.0.0_<id>_<timestamp>
 const genSession = () =>
@@ -24,13 +24,9 @@ const client: AxiosInstance = axios.create({
   },
 });
 
-// Cache client theo token để tránh tạo mới mỗi lần gọi
-const clientCache = new Map<string, AxiosInstance>();
-
-export function getClient(overrideToken?: string): AxiosInstance {
-  const token = overrideToken || ACCESS_TOKEN;
-  if (clientCache.has(token)) return clientCache.get(token)!;
-  const instance = axios.create({
+export async function getClient(overrideToken?: string): Promise<AxiosInstance> {
+  const token = await getAccessToken(overrideToken);
+  return axios.create({
     baseURL: BASE_URL,
     timeout: 20000,
     headers: {
@@ -41,8 +37,6 @@ export function getClient(overrideToken?: string): AxiosInstance {
       'mac-address': 'TEST1',
     },
   });
-  clientCache.set(token, instance);
-  return instance;
 }
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -227,7 +221,7 @@ export const uploadFile = async (
     form.append('title', title);
     form.append('description', description);
 
-    const token = overrideToken || ACCESS_TOKEN;
+    const token = await getAccessToken(overrideToken);
     const res = await axios.post(`${BASE_URL}/file-service/v1/addFile`, form, {
       headers: {
         ...form.getHeaders(),
@@ -262,7 +256,7 @@ export const classifyId = async (imgHash: string): Promise<ClassifyResult> => {
 
 export const checkCardLiveness = async (imgHash: string, overrideToken?: string): Promise<CardLivenessResult> => {
   try {
-    const res = await getClient(overrideToken).post('/ai/v1/card/liveness', {
+    const res = await (await getClient(overrideToken)).post('/ai/v1/card/liveness', {
       img: imgHash,
       client_session: genSession(),
     });
@@ -314,7 +308,7 @@ export const ocrId = async (
   overrideToken?: string
 ): Promise<OcrResult> => {
   try {
-    const res = await getClient(overrideToken).post('/ai/v1/ocr/id', {
+    const res = await (await getClient(overrideToken)).post('/ai/v1/ocr/id', {
       img_front: imgFrontHash,
       img_back: imgBackHash,
       client_session: genSession(),
@@ -337,7 +331,7 @@ export const compareFace = async (
   overrideToken?: string
 ): Promise<FaceCompareResult> => {
   try {
-    const res = await getClient(overrideToken).post('/ai/v1/face/compare', {
+    const res = await (await getClient(overrideToken)).post('/ai/v1/face/compare', {
       img_front: imgFrontHash,
       img_face: imgFaceHash,
       client_session: genSession(),
@@ -353,7 +347,7 @@ export const compareFace = async (
 
 export const checkFaceLiveness = async (imgHash: string, overrideToken?: string): Promise<FaceLivenessResult> => {
   try {
-    const res = await getClient(overrideToken).post('/ai/v1/face/liveness', {
+    const res = await (await getClient(overrideToken)).post('/ai/v1/face/liveness', {
       img: imgHash,
       client_session: genSession(),
       token: genToken(),
@@ -384,7 +378,7 @@ export const checkMask = async (
     const body: Record<string, unknown> = { img: imgHash, client_session: genSession() };
     if (faceBbox) body.face_bbox = faceBbox;
     if (faceLmark) body.face_lmark = faceLmark;
-    const res = await getClient(overrideToken).post('/ai/v1/face/mask', body);
+    const res = await (await getClient(overrideToken)).post('/ai/v1/face/mask', body);
     return unwrap<MaskResult>(res.data);
   } catch (err) {
     return handleErr('checkMask', err);

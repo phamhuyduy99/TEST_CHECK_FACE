@@ -3,6 +3,7 @@ import express, { Request, Response } from 'express';
 import multer from 'multer';
 import cors from 'cors';
 import { config } from './config';
+import { invalidateToken } from './services/tokenService';
 import {
   uploadFile,
   checkCardLiveness,
@@ -124,7 +125,9 @@ app.post(
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Unknown error';
       console.error(`❌ eKYC error:`, msg);
-      res.status(500).json({ error: msg });
+      const statusCode = (err as { response?: { status?: number } })?.response?.status;
+      if (statusCode === 401) invalidateToken();
+      res.status(statusCode === 401 ? 401 : 500).json({ error: msg });
     }
   }
 );
@@ -160,7 +163,7 @@ app.get('/api/health', (_req, res) => {
     status: 'ok',
     vnpt: {
       tokenId: process.env.VNPT_TOKEN_ID ? '✅ configured' : '❌ missing',
-      accessToken: process.env.VNPT_ACCESS_TOKEN ? '✅ configured' : '❌ missing',
+      username: process.env.VNPT_USERNAME ? '✅ configured' : '❌ missing',
     },
   });
 });
