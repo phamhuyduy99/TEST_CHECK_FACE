@@ -151,6 +151,9 @@ app.post('/api/ekyc/face', upload.single('face'), async (req: Request, res: Resp
   }
 });
 
+// ─── GET /api/ping ───────────────────────────────────────────────────────────
+app.get('/api/ping', (_req, res) => res.json({ ok: true }));
+
 // ─── GET /api/health ──────────────────────────────────────────────────────────
 app.get('/api/health', (_req, res) => {
   res.json({

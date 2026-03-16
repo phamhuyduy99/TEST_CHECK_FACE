@@ -1,4 +1,5 @@
 import { lazy, Suspense, useEffect, useState } from 'react';
+import { ping } from './services/apiService';
 import { Routes, Route } from 'react-router-dom';
 import { LangProvider } from './i18n';
 import { useExternalScripts } from './hooks/useExternalScripts';
@@ -82,6 +83,8 @@ function LoadingScreen() {
 
 function App() {
   const { hasError, failedScripts } = useExternalScripts();
+
+  useEffect(() => { ping(); }, []);
 
   return (
     <LangProvider>

@@ -1,7 +1,5 @@
 import { useState } from 'react';
-
-const API_URL = import.meta.env.VITE_API_URL || '';
-console.log(`[eKYC] API_URL = ${API_URL}`);
+import * as api from '../services/apiService';
 
 export interface EkycResult {
   ocr?: {
@@ -59,39 +57,8 @@ export default function useEkyc() {
     setLoading(true);
     setResult(null);
     setError(null);
-
-    console.log(`[eKYC] 🚀 Gửi request → ${API_URL}/api/ekyc`);
-    console.log(
-      `[eKYC] 📸 Ảnh: front=${(front.size / 1024).toFixed(0)}KB  back=${(back.size / 1024).toFixed(0)}KB  face=${(face.size / 1024).toFixed(0)}KB  source=${source}`
-    );
-
-    const form = new FormData();
-    form.append('front', front);
-    form.append('back', back);
-    form.append('face', face);
-
-    const headers: Record<string, string> = { 'x-source': source };
-    const savedToken = localStorage.getItem('vnpt_access_token');
-    if (savedToken) headers['x-vnpt-token'] = savedToken;
-
-    const t0 = Date.now();
     try {
-      const res = await fetch(`${API_URL}/api/ekyc`, { method: 'POST', body: form, headers });
-      console.log(`[eKYC] ⏱  Response: HTTP ${res.status} (${Date.now() - t0}ms)`);
-      if (res.status === 401) {
-        window.dispatchEvent(new CustomEvent('vnpt-token-expired'));
-        throw new Error('Token hết hạn. Vui lòng cập nhật Access Token.');
-      }
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Lỗi server');
-      console.log('[eKYC] ✅ Kết quả:', {
-        ocr: data.ocr?.msg,
-        cardLiveness: data.cardLiveness?.liveness,
-        faceLiveness: data.faceLiveness?.liveness,
-        mask: data.mask?.masked,
-        compare: data.compare?.msg,
-      });
-      setResult(data);
+      setResult(await api.runEkyc(front, back, face, source));
     } catch (err) {
       console.error('[eKYC] ❌ Lỗi:', err);
       setError(err instanceof Error ? err.message : 'Lỗi không xác định');
@@ -104,15 +71,8 @@ export default function useEkyc() {
     setLoading(true);
     setResult(null);
     setError(null);
-
-    const form = new FormData();
-    form.append('face', face);
-
     try {
-      const res = await fetch(`${API_URL}/api/ekyc/face`, { method: 'POST', body: form });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Lỗi server');
-      setResult({ faceLiveness: data.liveness, mask: data.mask });
+      setResult(await api.runFaceLiveness(face));
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Lỗi không xác định');
     } finally {
