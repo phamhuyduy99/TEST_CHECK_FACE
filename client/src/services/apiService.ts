@@ -27,6 +27,12 @@ export async function getToken(): Promise<string> {
   return data.access_token;
 }
 
+export async function initToken(): Promise<void> {
+  localStorage.removeItem('vnpt_access_token');
+  const token = await getToken();
+  localStorage.setItem('vnpt_access_token', token);
+}
+
 export async function ping(): Promise<void> {
   await api.get('/api/ping').catch(() => {});
 }
