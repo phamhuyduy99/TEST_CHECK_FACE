@@ -9,7 +9,6 @@ export const config = {
   vnpt: {
     tokenId: process.env.VNPT_TOKEN_ID,
     tokenKey: process.env.VNPT_TOKEN_KEY,
-    accessToken: process.env.VNPT_ACCESS_TOKEN,
   },
   cors: {
     origin: process.env.CORS_ORIGIN || [

@@ -157,6 +157,18 @@ app.post('/api/ekyc/face', upload.single('face'), async (req: Request, res: Resp
 // ─── GET /api/ping ───────────────────────────────────────────────────────────
 app.get('/api/ping', (_req, res) => res.json({ ok: true }));
 
+// ─── GET /api/token ──────────────────────────────────────────────────────────
+// Trả về access token hiện tại (tự refresh nếu hết hạn)
+app.get('/api/token', async (_req, res) => {
+  try {
+    const { getAccessToken } = await import('./services/tokenService');
+    const token = await getAccessToken();
+    res.json({ access_token: token });
+  } catch (err) {
+    res.status(500).json({ error: err instanceof Error ? err.message : 'Lỗi lấy token' });
+  }
+});
+
 // ─── GET /api/health ──────────────────────────────────────────────────────────
 app.get('/api/health', (_req, res) => {
   res.json({

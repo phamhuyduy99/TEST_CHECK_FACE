@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useT } from '../i18n';
+import { getToken } from '../services/apiService';
 
 declare const ekycsdk: {
   init: (config: object, cb: (res: unknown) => void) => void;
@@ -51,12 +52,14 @@ export default function VnptSdkPage() {
         return;
       }
 
+      const access_token = await getToken();
+
       ekycsdk.init(
         {
           BACKEND_URL: 'https://api.idg.vnpt.vn',
           TOKEN_KEY: import.meta.env.VITE_VNPT_TOKEN_KEY ?? '',
           TOKEN_ID: import.meta.env.VITE_VNPT_TOKEN_ID ?? '',
-          AUTHORIZION: import.meta.env.VITE_VNPT_ACCESS_TOKEN ?? '',
+          AUTHORIZION: access_token ?? '',
           PARRENT_ID: 'ekyc_sdk_intergrated',
           FLOW_TYPE: 'DOCUMENT',
           SHOW_RESULT: true,

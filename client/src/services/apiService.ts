@@ -1,27 +1,34 @@
+import axios from 'axios';
 import type { EkycResult } from '../hooks/useEkyc';
 
-const API_URL = import.meta.env.VITE_API_URL || '';
-console.log(`[apiService] API_URL = ${API_URL}`);
+const api = axios.create({
+  baseURL: import.meta.env.VITE_API_URL || '',
+});
 
-function getHeaders(extra: Record<string, string> = {}): Record<string, string> {
-  const headers: Record<string, string> = { ...extra };
-  const savedToken = localStorage.getItem('vnpt_access_token');
-  if (savedToken) headers['x-vnpt-token'] = savedToken;
-  return headers;
-}
+api.interceptors.request.use(config => {
+  const token = localStorage.getItem('vnpt_access_token');
+  if (token) config.headers['x-vnpt-token'] = token;
+  return config;
+});
 
-async function handleResponse<T>(res: Response): Promise<T> {
-  if (res.status === 401) {
-    window.dispatchEvent(new CustomEvent('vnpt-token-expired'));
-    throw new Error('Token hết hạn. Vui lòng cập nhật Access Token.');
+api.interceptors.response.use(
+  res => res,
+  err => {
+    if (err.response?.status === 401) {
+      window.dispatchEvent(new CustomEvent('vnpt-token-expired'));
+      throw new Error('Token hết hạn. Vui lòng cập nhật Access Token.');
+    }
+    throw new Error(err.response?.data?.error || 'Lỗi server');
   }
-  const data = await res.json();
-  if (!res.ok) throw new Error(data.error || 'Lỗi server');
-  return data as T;
+);
+
+export async function getToken(): Promise<string> {
+  const { data } = await api.get<{ access_token: string }>('/api/token');
+  return data.access_token;
 }
 
 export async function ping(): Promise<void> {
-  await fetch(`${API_URL}/api/ping`).catch(() => {});
+  await api.get('/api/ping').catch(() => {});
 }
 
 export async function runEkyc(
@@ -41,14 +48,10 @@ export async function runEkyc(
   );
 
   const t0 = Date.now();
-  const res = await fetch(`${API_URL}/api/ekyc`, {
-    method: 'POST',
-    body: form,
-    headers: getHeaders({ 'x-source': source }),
+  const { data } = await api.post<EkycResult>('/api/ekyc', form, {
+    headers: { 'x-source': source },
   });
-  console.log(`[apiService] ⏱  HTTP ${res.status} (${Date.now() - t0}ms)`);
-
-  const data = await handleResponse<EkycResult>(res);
+  console.log(`[apiService] ⏱  (${Date.now() - t0}ms)`);
   console.log('[apiService] ✅ ekyc:', {
     ocr: data.ocr?.msg,
     cardLiveness: data.cardLiveness?.liveness,
@@ -65,11 +68,9 @@ export async function runFaceLiveness(
   const form = new FormData();
   form.append('face', face);
 
-  const res = await fetch(`${API_URL}/api/ekyc/face`, {
-    method: 'POST',
-    body: form,
-    headers: getHeaders(),
-  });
-  const data = await handleResponse<{ liveness: EkycResult['faceLiveness']; mask: EkycResult['mask'] }>(res);
+  const { data } = await api.post<{ liveness: EkycResult['faceLiveness']; mask: EkycResult['mask'] }>(
+    '/api/ekyc/face',
+    form
+  );
   return { faceLiveness: data.liveness, mask: data.mask };
 }
